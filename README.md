@@ -11,17 +11,24 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 > CAD will be published shortly.
 
 > [!IMPORTANT]
-> I added a Werdna Odometry broadcaster as an alternative to the werdna odometry node to determine if it works the same overall. Hopefully this broadcaster works so i can just yolo the odometry node overall.
+> The Werdna Odometry Broadcaster is not tested in real life. It is not integrated with the IMU but only uses wheel data for planar odometry purposes.
+
+>[!IMPORTANT]
 > Will be switching the agent to be implemented using onxx to avoid issues with real time control loop when inferencing with torch
 > Rewriting the hardware interface to use the c++ bindings with the moteus c++ libraries.
+
+> [!IMPORTANT]
+> The pi3hat hardware interface is not tested yet and is written with more relevance to my implementation, may edit to suit your own needs.
+> It does not make use of the IMU on board.
+
+
 <details>
   <summary>Dependencies</summary>
 
   1. `ROS2 Control`
   2. `ROS2 Controllers` 
-  3. `Stable Baselines3`
-  4. `Gymnasium`
-  5. Moteus C++ Library
+  3. `ONXX RunTime`
+  4. `Moteus`
    
 </details>
 
@@ -33,8 +40,7 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 |`werdna_bringup`|Bringup Commands|
 |`werdna_description`|Description of URDF Models|
 |`werdna_msgs`|custom messages for werdna teleoperation|
-|`werdna_odometry`|Publish Odometry from wheels joint information|
-|`werdna_hardware_interface`|custom Hardware Interface from RPI->Teensy|
+|`pi3hat_hardware_interface`|custom Hardware Interface from RPI->Pi3Hat|
 |`werdna_teleop`|Teleoperation Commands for Joystick|
 |`werdna_agent`|Node to run trained agent inference|
 |`werdna_odometry_broadcaster`|Broadcaster for Odometry|
@@ -55,7 +61,7 @@ ros2 launch bringup launch_robot.py
 It should should launch the description, relevant controllers and hardware interface, teleoperation (joystick), and finally the trained agent at once
 
 ## TODO
-- [ ] Write pi3hat hardware interface instead of using esp32 
+- [x] Write pi3hat hardware interface instead of using esp32 
 - [ ] Rewrite agent node to use onxxruntime
 - [x] Rewrite messages and teleop nodes to accomodate for new observation spaces.
 - [x] Update URDF as wheel
@@ -63,7 +69,7 @@ It should should launch the description, relevant controllers and hardware inter
 ## Features
 - [x] **BringUp Actions**: Launches the Controllers, Hardware Interface, Teleoperation Node for Joysticks, and the trained agent's inference node at once
 - [x] **Description**: Contains URDF for the Werdna Robot and linked it to the hardware interface
-- [x] **Hardware Interface**: Connected to a Teensy Controller and communicates via Serial Command
+- [x] **Hardware Interface**: Overlays the Pi3Hat to communicate with moteus controllers via ROS2 Control
 - [x] **Messages**: Custom Messages for the robot
 - [x] **Odometry Broadcaster**: A copy from diff drive controller source code with only the odometry contents, meant to publish odometry from wheel positions
 - [x] **Teleop**: Maps Joystick Interface to the custom messages
