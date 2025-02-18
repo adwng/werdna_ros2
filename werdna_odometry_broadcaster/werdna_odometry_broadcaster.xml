@@ -1,0 +1,7 @@
+<library path="werdna_odometry_broadcaster">
+  <class name="werdna_odometry_broadcaster/WerdnaOdometryBroadcaster" type="werdna_odometry_broadcaster::WerdnaOdometryBroadcaster" base_class_type="controller_interface::ControllerInterface">
+  <description>
+    Publish Odometry based on Wheel Feedback
+  </description>
+  </class>
+</library>

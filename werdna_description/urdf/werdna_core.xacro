@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="werdna">
+        
+    <xacro:include filename="$(find werdna_description)/urdf/werdna.xacro"/>
+    <xacro:include filename="$(find werdna_description)/ros2_control/ros2_control.xacro"/>
+
+</robot>

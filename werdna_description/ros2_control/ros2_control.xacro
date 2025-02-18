@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    
+    <ros2_control name="werdna_ros2_control" type="system">
+        <hardware>
+            <plugin>werdna_hardware_interface/WerdnaControlHardware</plugin>
+            <param name="left_hip_name">left_hip_motor_joint</param>
+            <param name="left_knee_name">left_knee_joint</param>
+            <param name="left_wheel_name">left_wheel_joint</param>
+            <param name="right_hip_name">right_hip_motor_joint</param>
+            <param name="right_knee_name">right_knee_joint</param>
+            <param name="right_wheel_name">right_wheel_joint</param>
+            <param name="device">/dev/ttyACM0</param>
+            <param name="baud_rate">115200</param>
+            <param name="timeout_ms">1000</param>
+        </hardware>
+
+        <joint name="left_hip_motor_joint">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+
+        <joint name="left_knee_joint">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+
+        <joint name="left_wheel_joint">
+            <command_interface name="effort"/>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+
+        <joint name="right_hip_motor_joint">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+
+        <joint name="right_knee_joint">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+
+        <joint name="right_wheel_joint">
+            <command_interface name="effort"/>
+            <state_interface name="position"/>
+            <state_interface name="velocity"/>
+        </joint>
+
+    </ros2_control>
+
+</robot>

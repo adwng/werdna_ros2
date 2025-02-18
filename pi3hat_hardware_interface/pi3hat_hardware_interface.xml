@@ -1,0 +1,9 @@
+<library path="pi3hat_hardware_interface">
+  <class name="pi3hat_hardware_interface/Pi3HatControlHardware"
+         type="pi3hat_hardware_interface::Pi3HatControlHardware"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      The ros2_control DiffBot example using a system hardware interface-type. It uses position and torque as command, velocity and position state interface.
+    </description>
+  </class>
+</library>
