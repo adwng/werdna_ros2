@@ -33,7 +33,7 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
         hw_actuator_can_channels_.push_back(std::stoi(joint.parameters.at("can_channel")));
         hw_actuator_can_ids_.push_back(std::stoi(joint.parameters.at("can_id")));
         hw_actuator_position_offsets_.push_back(std::stod(joint.parameters.at("position_offset")));
-        control_modes_.push_back(joint.parameters.at("control_mode "));
+        control_modes_.push_back(joint.parameters.at("control_mode"));
 
 
     }
@@ -65,22 +65,27 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
     // Create the transport with the populated options
     transport = std::make_shared<Transport>(toptions);
 
-    // Set up controllers
-    for (size_t i = 0; i<hw_actuator_can_ids_.size(); ++i)
+    for (unsigned long i = 0; i<info_.joints.size(); i++)
     {
+        mjbots::moteus::Controller::Options options;
+        options.transport = transport;
+        options.id = hw_actuator_can_ids_[i];
+        if (control_modes_[i] == "effort")
+        {
+            options.position_format.position = mjbots::moteus::kIgnore;
+            options.position_format.velocity = mjbots::moteus::kIgnore;
+            options.position_format.feedforward_torque = mjbots::moteus::kFloat;
+            options.position_format.kp_scale = mjbots::moteus::kInt8;
+            options.position_format.kd_scale = mjbots::moteus::kInt8;
+        }
+
         controllers.push_back(
-            std::make_shared<mjbots::moteus::Controller>([&]() {
-                mjbots::moteus::Controller::Options options;
-                options.transport = transport;
-                options.id = hw_actuator_can_ids_[i];
-                return options;
-              }())
+            std::make_shared<mjbots::moteus::Controller>(options)
         );
     }
 
     // Clear Faults
     for (auto& c:controllers){ c->SetStop(); }
-
 
     return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -169,7 +174,8 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_activate(
 hardware_interface::CallbackReturn Pi3HatControlHardware::on_deactivate(
     const rclcpp_lifecycle::State & /*previous_state*/)
 {
-    for (auto& c : controllers) { c->SetBrake(); }
+    // Clear Faults
+    for (auto& c:controllers){ c->SetBrake(); }
     
     RCLCPP_INFO(rclcpp::get_logger("Pi3HatControlHardware"), "Successfully deactivated!");
 
@@ -214,15 +220,14 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
 
         if (control_modes_[i] == "position")  // Position control
         {
-            cmd.position = hw_command_positions_[i] + hw_actuator_position_offsets_[i];
+            cmd.position = ((hw_command_positions_[i] / 2 * M_PI) * 4.5) + hw_actuator_position_offsets_[i];
             cmd.velocity_limit = 2.0;
             cmd.accel_limit = 3.0;
         }
         else if (control_modes_[i] == "effort")  // Effort control
         {
-            cmd.position = mjbots::moteus::kIgnore;
-            cmd.kp_scale = 0.0;
-            cmd.kd_scale = 0.0;
+            cmd.kp_scale = 0.0f;
+            cmd.kd_scale = 0.0f;
             cmd.feedforward_torque = hw_command_efforts_[i];
         }
 
@@ -234,7 +239,6 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
         &send_frames[0], send_frames.size(),
         &receive_frames
     );
-
 
     // From Received Frames, it will iterate through each joint, and for each joint, it will determine if the frames matches that of the can id, and if such, parses the results
     for (size_t i = 0 ; i < info_.joints.size(); ++i)

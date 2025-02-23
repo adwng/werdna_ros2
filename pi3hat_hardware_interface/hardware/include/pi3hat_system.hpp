@@ -65,6 +65,15 @@ public:
         const rclcpp::Time & time, const rclcpp::Duration & period) override;
     
 private:
+    
+    void busy_wait_us(unsigned long microsec) {
+        // Convert microseconds to clock ticks. std::CLOCKS_PER_SEC is the number of clock ticks per second.
+        std::clock_t end = std::clock() + (microsec * CLOCKS_PER_SEC / 1000000);
+        
+        while (std::clock() < end) {
+            // Busy wait
+        }
+    }
 
     using QueryResult = mjbots::moteus::Query::Result;
     using Transport = mjbots::pi3hat::Pi3HatMoteusTransport; 
@@ -78,7 +87,6 @@ private:
     //Frames
     std::vector<mjbots::moteus::CanFdFrame> send_frames;
     std::vector<mjbots::moteus::CanFdFrame> receive_frames;
-
     
     // Actuator CAN config
     std::vector<int> hw_actuator_can_channels_;

@@ -3,53 +3,76 @@
     
     <ros2_control name="werdna_ros2_control" type="system">
         <hardware>
-            <plugin>werdna_hardware_interface/WerdnaControlHardware</plugin>
-            <param name="left_hip_name">left_hip_motor_joint</param>
-            <param name="left_knee_name">left_knee_joint</param>
-            <param name="left_wheel_name">left_wheel_joint</param>
-            <param name="right_hip_name">right_hip_motor_joint</param>
-            <param name="right_knee_name">right_knee_joint</param>
-            <param name="right_wheel_name">right_wheel_joint</param>
-            <param name="device">/dev/ttyACM0</param>
-            <param name="baud_rate">115200</param>
-            <param name="timeout_ms">1000</param>
+            <plugin>pi3hat_hardware_interface/Pi3HatControlHardware</plugin>
         </hardware>
 
         <joint name="left_hip_motor_joint">
             <command_interface name="position"/>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
+
+            <param name="can_channel">1</param>
+            <param name="can_id">1</param>
+            <param name="position_offset">-0.1</param>
+            <param name="control_mode">position</param>
         </joint>
 
         <joint name="left_knee_joint">
             <command_interface name="position"/>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
+
+            <param name="can_channel">1</param>
+            <param name="can_id">2</param>
+            <param name="position_offset">-0.0</param>
+            <param name="control_mode">position</param>
         </joint>
 
-        <joint name="left_wheel_joint">
+        <!-- <joint name="left_wheel_joint">
             <command_interface name="effort"/>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
-        </joint>
+
+            <param name="can_channel">1</param>
+            <param name="can_id">3</param>
+            <param name="position_offset">-0.1</param>
+            <param name="control_mode">effort</param>
+
+            
+        </joint> -->
 
         <joint name="right_hip_motor_joint">
             <command_interface name="position"/>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
+
+            <param name="can_channel">2</param>
+            <param name="can_id">4</param>
+            <param name="position_offset">-0.0</param>
+            <param name="control_mode">position</param>
         </joint>
 
         <joint name="right_knee_joint">
             <command_interface name="position"/>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
+
+            <param name="can_channel">2</param>
+            <param name="can_id">5</param>
+            <param name="position_offset">-0.0</param>
+            <param name="control_mode">position</param>
         </joint>
 
-        <joint name="right_wheel_joint">
+        <!-- <joint name="right_wheel_joint">
             <command_interface name="effort"/>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
-        </joint>
+
+            <param name="can_channel">2</param>
+            <param name="can_id">6</param>
+            <param name="position_offset">-0.0</param>
+            <param name="control_mode">effort</param>
+        </joint> -->
 
     </ros2_control>
 
