@@ -88,6 +88,43 @@ Selected based on *control mode* in the urdf file, it requires manual adjustment
 - Angular Velocities
 - Linear Acceleration
 
+**Example Xacro File for hardware interface set up**
+```
+<ros2_control name="pi3hat_hardware_interface" type="system">
+    <hardware>
+        <plugin>pi3hat_hardware_interface/Pi3HatHardwareInterface</plugin>
+        <param name="imu_mounting_deg.yaw">0</param>
+        <param name="imu_mounting_deg.pitch">0</param>
+        <param name="imu_mounting_deg.roll">0</param>
+    </hardware>
+
+    <joint name="joint_1">
+        <param name="can_channel">1</param>
+        <param name="can_id">1</param>
+
+        <param name="position_offset">0.0</param>
+        <param name="control_mode">position</param>
+
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+
+    <sensor name="imu_sensor">
+        <state_interface name="orientation.x"/>
+        <state_interface name="orientation.y"/>
+        <state_interface name="orientation.z"/>
+        <state_interface name="orientation.w"/>
+        <state_interface name="angular_velocity.x"/>
+        <state_interface name="angular_velocity.y"/>
+        <state_interface name="angular_velocity.z"/>
+        <state_interface name="linear_acceleration.x"/>
+        <state_interface name="linear_acceleration.y"/>
+        <state_interface name="linear_acceleration.z"/>
+    </sensor>
+</ros2_control>
+```
+
 Ensure its at default position where all joints report `0`.
 
 
