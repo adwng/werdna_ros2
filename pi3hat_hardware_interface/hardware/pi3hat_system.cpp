@@ -9,6 +9,8 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
 
+#define DEG_TO_RAD 0.01745329251994329576923690768489
+
 namespace pi3hat_hardware_interface
 {
 hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware_interface::HardwareInfo &info)
@@ -26,7 +28,6 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
     hw_command_positions_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
     hw_command_efforts_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
-    
     for (const hardware_interface::ComponentInfo & joint : info_.joints)
     {
         // Set params for each joint
@@ -34,8 +35,6 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
         hw_actuator_can_ids_.push_back(std::stoi(joint.parameters.at("can_id")));
         hw_actuator_position_offsets_.push_back(std::stod(joint.parameters.at("position_offset")));
         control_modes_.push_back(joint.parameters.at("control_mode"));
-
-
     }
 
     Transport::Options toptions;
@@ -62,8 +61,16 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
         }
     }
 
+    // Configure IMU Settings Here
+    toptions.attitude_rate_hz = 1000;
+    toptions.default_input.request_attitude = true;
+    toptions.default_input.wait_for_attitude = true;
+    toptions.mounting_deg.pitch = std::stod(info_.hardware_parameters.at("imu_mounting_deg.pitch"));
+    toptions.mounting_deg.yaw = std::stod(info_.hardware_parameters.at("imu_mounting_deg.yaw"));
+    toptions.mounting_deg.roll = std::stod(info_.hardware_parameters.at("imu_mounting_deg.roll"));
+
     // Create the transport with the populated options
-    transport = std::make_shared<Transport>(toptions);
+    auto transport = std::make_shared<Transport>(toptions);
 
     for (unsigned long i = 0; i<info_.joints.size(); i++)
     {
@@ -109,6 +116,28 @@ std::vector<hardware_interface::StateInterface> Pi3HatControlHardware::export_st
             info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &hw_state_velocities_[i]));
     }
 
+    //Add IMU State Interfaces
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        "imu_sensor", "orientation.x", &hw_state_imu_orientation_[0]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        "imu_sensor", "orientation.y", &hw_state_imu_orientation_[1]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        "imu_sensor", "orientation.z", &hw_state_imu_orientation_[2]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        "imu_sensor", "orientation.w", &hw_state_imu_orientation_[3]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        "imu_sensor", "angular_velocity.x", &hw_state_imu_angular_velocity_[0]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        "imu_sensor", "angular_velocity.y", &hw_state_imu_angular_velocity_[1]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        "imu_sensor", "angular_velocity.z", &hw_state_imu_angular_velocity_[2]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        "imu_sensor", "linear_acceleration.x", &hw_state_imu_linear_acceleration_[0]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        "imu_sensor", "linear_acceleration.y", &hw_state_imu_linear_acceleration_[1]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(
+        "imu_sensor", "linear_acceleration.z", &hw_state_imu_linear_acceleration_[2]));
+
     return state_interfaces;
 }
 
@@ -143,6 +172,7 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_configure(
     const rclcpp_lifecycle::State & /*previous_state*/)
 {
     RCLCPP_INFO(rclcpp::get_logger("Pi3HatControlHardware"), "Configuring ...please wait...");
+
      // reset values always when configuring hardware
      for (uint i = 0; i < hw_state_positions_.size(); i++)
      {
@@ -201,7 +231,6 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
     const rclcpp::Time &, const rclcpp::Duration &period
 )
 {
-
     send_frames.clear();
     receive_frames.clear();
 
@@ -221,15 +250,17 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
             continue;
         }
 
+        double computed_cmd;
 
         // Sending Comamnds
         mjbots::moteus::PositionMode::Command cmd;
 
         if (control_modes_[i] == "position")  // Position control
         {
-            cmd.position = 0.0; //((hw_command_positions_[i] / 2 * M_PI) * 9.0) + hw_actuator_position_offsets_[i];
-            cmd.velocity_limit = 1.0;
-            cmd.accel_limit = 1.0;
+            computed_cmd = ((hw_command_positions_[i] / (2 * M_PI)) * 9.0) + hw_actuator_position_offsets_[i];
+            cmd.position = 0.0f; //((hw_command_positions_[i] / (2 * M_PI)) * 9.0) + hw_actuator_position_offsets_[i];
+            cmd.velocity_limit = 1.0f;
+            cmd.accel_limit = 2.0f;
         }
         else if (control_modes_[i] == "effort")  // Effort control
         {
@@ -238,14 +269,25 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
             cmd.feedforward_torque = hw_command_efforts_[i];
         }
 
+        RCLCPP_INFO(
+            rclcpp::get_logger("Pi3HatControlHardware"),
+            "Joint: %s, Command Type: %s, Command: %.3f",
+            info_.joints[i].name.c_str(),
+            control_modes_[i].c_str(),
+            (control_modes_[i] == "position") ? computed_cmd : hw_command_efforts_[i]
+        );
+
         send_frames.push_back(controllers[i]->MakePosition(cmd));
     }
 
     // Send the frames and receive back the frames reported
-    transport->BlockingCycle(
-        &send_frames[0], send_frames.size(),
-        &receive_frames
-    );
+    // transport->BlockingCycle(
+    //     &send_frames[0], send_frames.size(),
+    //     &receive_frames
+    // );
+    transport->Cycle(&send_frames[0], send_frames.size(), &receive_frames, &attitude, nullptr, nullptr, cbk.callback());
+
+    cbk.Wait();
 
     // From Received Frames, it will iterate through each joint, and for each joint, it will determine if the frames matches that of the can id, and if such, parses the results
     for (size_t i = 0 ; i < info_.joints.size(); ++i)
@@ -286,6 +328,19 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
             }
         }
     }
+
+    //Processing Attitude
+    hw_state_imu_orientation_[0] = attitude.attitude.w;
+    hw_state_imu_orientation_[1] = attitude.attitude.z;
+    hw_state_imu_orientation_[2] = attitude.attitude.y;
+    hw_state_imu_orientation_[3] = attitude.attitude.x;
+    hw_state_imu_angular_velocity_[0] = attitude.rate_dps.x * DEG_TO_RAD;
+    hw_state_imu_angular_velocity_[1] = attitude.rate_dps.y * DEG_TO_RAD;
+    hw_state_imu_angular_velocity_[2] = attitude.rate_dps.z * DEG_TO_RAD;
+    hw_state_imu_linear_acceleration_[0] = attitude.accel_mps2.x;
+    hw_state_imu_linear_acceleration_[1] = attitude.accel_mps2.y;
+    hw_state_imu_linear_acceleration_[2] = attitude.accel_mps2.z;
+
 
     return hardware_interface::return_type::OK;
 }

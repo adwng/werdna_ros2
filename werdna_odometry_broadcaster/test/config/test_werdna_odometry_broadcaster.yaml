@@ -7,18 +7,5 @@ controller_manager:
 
 werdna_odometry_broadcaster:
   ros__parameters:
-    left_wheel_names: ["left_wheel_joint"]
-    right_wheel_names: ["right_wheel_joint"]
 
     wheel_separation: 0.15
-    wheel_radius: 0.0762
-
-    odom_frame_id: odom
-    base_frame_id: base_link
-    pose_covariance_diagonal: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    twist_covariance_diagonal: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-
-    position_feedback: false
-    enable_odom_tf: true
-
-    velocity_rolling_window_size: 10

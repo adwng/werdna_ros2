@@ -3,30 +3,28 @@
 <package format="3">
   <name>werdna_odometry_broadcaster</name>
   <version>0.0.0</version>
-  <description>Publish Odometry Based on Wheel Feedback</description>
+  <description>Publish Odometry</description>
   <maintainer email="andrewngcheewei@hotmail.com">andrew</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <build_depend>generate_parameter_library</build_depend>
 
-  <depend>backward_ros</depend>
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
   <depend>controller_interface</depend>
-  <depend>geometry_msgs</depend>
   <depend>hardware_interface</depend>
-  <depend>nav_msgs</depend>
   <depend>pluginlib</depend>
+  <depend>realtime_tools</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
-  <depend>rcpputils</depend>
-  <depend>realtime_tools</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>tf2</depend>
   <depend>tf2_msgs</depend>
-
-  <test_depend>ament_cmake_gmock</test_depend>
-  <test_depend>controller_manager</test_depend>
-  <test_depend>hardware_interface_testing</test_depend>
-  <test_depend>ros2_control_test_assets</test_depend>
+  <depend>generate_parameter_library</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

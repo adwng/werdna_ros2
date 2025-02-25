@@ -5,48 +5,58 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-set(THIS_PACKAGE_INCLUDE_DEPENDS
-  controller_interface
-  generate_parameter_library
-  geometry_msgs
-  hardware_interface
-  nav_msgs
-  pluginlib
-  rclcpp
-  rclcpp_lifecycle
-  rcpputils
-  realtime_tools
-  tf2
-  tf2_msgs
-)
+add_library(werdna_odometry_broadcaster SHARED src/werdna_odometry_broadcaster.cpp)
 
+# find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(backward_ros REQUIRED)
-foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
-  find_package(${Dependency} REQUIRED)
-endforeach()
+find_package(controller_interface REQUIRED)
+find_package(hardware_interface REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(realtime_tools REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_msgs REQUIRED)
+find_package(generate_parameter_library REQUIRED)
 
 generate_parameter_library(werdna_odometry_broadcaster_parameters
   src/werdna_odometry_broadcaster_parameters.yaml
 )
 
-add_library(
-  werdna_odometry_broadcaster SHARED
-  src/werdna_odometry_broadcaster.cpp
-  src/odometry.cpp
+target_link_libraries(werdna_odometry_broadcaster werdna_odometry_broadcaster_parameters)
+
+target_include_directories(werdna_odometry_broadcaster PRIVATE include)
+
+ament_target_dependencies(
+  werdna_odometry_broadcaster
+  controller_interface
+  hardware_interface
+  pluginlib
+  realtime_tools
+  rclcpp
+  rclcpp_lifecycle
+  geometry_msgs
+  nav_msgs
+  sensor_msgs
+  std_msgs
+  tf2
+  tf2_msgs
 )
 
-target_compile_features(werdna_odometry_broadcaster PUBLIC cxx_std_17)
-target_include_directories(werdna_odometry_broadcaster PUBLIC
-  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include/werdna_odometry_broadcaster>
-)
-target_link_libraries(werdna_odometry_broadcaster PUBLIC werdna_odometry_broadcaster_parameters)
-ament_target_dependencies(werdna_odometry_broadcaster PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
-# Causes the visibility macros to use dllexport rather than dllimport,
-# which is appropriate when building the dll but not consuming it.
-target_compile_definitions(werdna_odometry_broadcaster PRIVATE "WERDNA_ODOMETRY_BROADCASTER_BUILDING_DLL")
 pluginlib_export_plugin_description_file(controller_interface werdna_odometry_broadcaster.xml)
+
+install(
+  TARGETS ${PROJECT_NAME}
+  DESTINATION lib
+)
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -60,17 +70,4 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-install(
-  DIRECTORY include/
-  DESTINATION include/werdna_odometry_broadcaster
-)
-install(TARGETS werdna_odometry_broadcaster werdna_odometry_broadcaster_parameters
-  EXPORT export_werdna_odometry_broadcaster
-  RUNTIME DESTINATION bin
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-)
-
-ament_export_targets(export_werdna_odometry_broadcaster HAS_LIBRARY_TARGET)
-ament_export_dependencies(${THIS_PACKAGE_INCLUDE_DEPENDS})
 ament_package()

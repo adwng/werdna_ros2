@@ -65,28 +65,27 @@ public:
         const rclcpp::Time & time, const rclcpp::Duration & period) override;
     
 private:
-    
-    void busy_wait_us(unsigned long microsec) {
-        // Convert microseconds to clock ticks. std::CLOCKS_PER_SEC is the number of clock ticks per second.
-        std::clock_t end = std::clock() + (microsec * CLOCKS_PER_SEC / 1000000);
-        
-        while (std::clock() < end) {
-            // Busy wait
-        }
-    }
 
     using QueryResult = mjbots::moteus::Query::Result;
     using Transport = mjbots::pi3hat::Pi3HatMoteusTransport; 
-    
-    // Add transport to be accesssed globally
-    std::shared_ptr<mjbots::moteus::Transport> transport;
+
+    std::shared_ptr<Transport> transport;
         
     // controllers
     std::vector<std::shared_ptr<mjbots::moteus::Controller>> controllers;
 
+    //IMU
+    mjbots::pi3hat::Attitude attitude;
+    std::array<double, 4> hw_state_imu_orientation_;         // x, y, z, w
+    std::array<double, 3> hw_state_imu_angular_velocity_;    // x, y, z
+    std::array<double, 3> hw_state_imu_linear_acceleration_; // x, y, z
+
     //Frames
     std::vector<mjbots::moteus::CanFdFrame> send_frames;
     std::vector<mjbots::moteus::CanFdFrame> receive_frames;
+
+    //Callbaks
+    mjbots::moteus::BlockingCallback cbk;
     
     // Actuator CAN config
     std::vector<int> hw_actuator_can_channels_;

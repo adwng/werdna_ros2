@@ -11,12 +11,7 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 > CAD will be published shortly.
 
 > [!IMPORTANT]
-> The Werdna Odometry Broadcaster is not tested in real life. It is not integrated with the IMU but only uses wheel data for planar odometry purposes.
-
->[!IMPORTANT]
-> Will be switching the agent to be implemented using onxx to avoid issues with real time control loop when inferencing with torch
-> Rewriting the hardware interface to use the c++ bindings with the moteus c++ libraries.
-
+> The Werdna Odometry Broadcaster is not tested in real life yet. Uses IMU and joints pos and handles publishing joint states, imu states, odometry, and tfs.
 
 <details>
   <summary>Dependencies</summary>
@@ -25,6 +20,7 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
   2. `ROS2 Controllers` 
   3. `ONXX RunTime`
   4. `Moteus`
+  5. `pi3hat`
    
 </details>
 
@@ -43,26 +39,32 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 
 ## Code Run
 **Launch in Base**
-|`CAPTCHAS`|Explanation|
+|`CAPTCHAS`|`Explanation`|
 |----------|-----------|
-|Super User Mode|Ensure Super User Mode, Since the pi3hat requires root access to use the GPIO pins|
-|UDP Memory Switch|Force FastDDS to use UDP instead of shared memory|
+|***Super User Mode***|Ensure Super User Mode, Since the pi3hat requires root access to use the GPIO pins|
+|***UDP Memory Switch***|Force FastDDS to use UDP instead of shared memory|
 
 ```
 sudo bash
 export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/pi3hat_hardware_interface/fastrtps_profile_no_shmem.xml
 source /opt/ros/humble/setup.bash
 source werdna_ws/install/setup.bash
-ros2 launch bringup launch_robot.py
+ros2 launch werdna_description ros2_control.launch.py
 ```
 
-It should should launch the description, relevant controllers and hardware interface, teleoperation (joystick), and finally the trained agent at once
+It should should launch the description, relevant controllers and hardware interface.
+
+> [!NOTE]
+> If wish to view ROS2 topics and also enable your other programs to publish/subscribe to it. Ensure the session is enabled the same way as the script above (entering superuser mode->exporting profiles->sourcing relevant environments).
+> Of course, it can be launched all together with the same launch file
+
 
 ## TODO
 - [x] Write pi3hat hardware interface instead of using esp32 
-- [ ] Rewrite agent node to use onxxruntime
+- [x] Rewrite agent node to use onxxruntime
 - [x] Rewrite messages and teleop nodes to accomodate for new observation spaces.
 - [x] Update URDF as wheel
+- [ ] Test controller interface
 
 ## Features
 - [x] **BringUp Actions**: Launches the Controllers, Hardware Interface, Teleoperation Node for Joysticks, and the trained agent's inference node at once
@@ -71,3 +73,23 @@ It should should launch the description, relevant controllers and hardware inter
 - [x] **Messages**: Custom Messages for the robot
 - [x] **Odometry Broadcaster**: A copy from diff drive controller source code with only the odometry contents, meant to publish odometry from wheel positions
 - [x] **Teleop**: Maps Joystick Interface to the custom messages
+
+## PI3HAT HARWARE INTERFACE DETAILS
+### Command Interfaces
+- Position
+- Torque
+
+Selected based on *control mode* in the urdf file, it requires manual adjustment on the acceleration and velocity limits. 
+
+### State Interfaces
+- Position 
+- Velocity
+- Quarternion Orientation
+- Angular Velocities
+- Linear Acceleration
+
+Ensure its at default position where all joints report `0`.
+
+
+
+
