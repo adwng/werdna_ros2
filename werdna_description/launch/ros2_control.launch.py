@@ -18,7 +18,7 @@ def generate_launch_description():
         ]
     )
 
-    robot_description = {"robot_description", robot_description_content}
+    robot_description = {"robot_description": robot_description_content}
 
     robot_controllers = PathJoinSubstitution(
         [
@@ -97,8 +97,8 @@ def generate_launch_description():
         control_node,
         joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
-        delay_wheel_controller_spawner_after_robot_controller_spawner,
-        delay_odometry_broadcaster_spawner_after_wheel_controller_spawner
+        # delay_wheel_controller_spawner_after_robot_controller_spawner,
+        # delay_odometry_broadcaster_spawner_after_wheel_controller_spawner
     ]
 
     return LaunchDescription(

@@ -13,7 +13,7 @@
 
             <param name="can_channel">1</param>
             <param name="can_id">1</param>
-            <param name="position_offset">-0.1</param>
+            <param name="position_offset">1.5</param>
             <param name="control_mode">position</param>
         </joint>
 
@@ -24,7 +24,7 @@
 
             <param name="can_channel">1</param>
             <param name="can_id">2</param>
-            <param name="position_offset">-0.0</param>
+            <param name="position_offset">-0.8</param>
             <param name="control_mode">position</param>
         </joint>
 
@@ -48,7 +48,7 @@
 
             <param name="can_channel">2</param>
             <param name="can_id">4</param>
-            <param name="position_offset">-0.0</param>
+            <param name="position_offset">1.5</param>
             <param name="control_mode">position</param>
         </joint>
 
@@ -59,7 +59,7 @@
 
             <param name="can_channel">2</param>
             <param name="can_id">5</param>
-            <param name="position_offset">-0.0</param>
+            <param name="position_offset">-0.8</param>
             <param name="control_mode">position</param>
         </joint>
 

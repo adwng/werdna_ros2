@@ -85,11 +85,6 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
     }
 
     // Clear Faults
-    for (auto& c:controllers){ c->SetStop(); }
-
-    return hardware_interface::CallbackReturn::SUCCESS;
-}
-
 std::vector<hardware_interface::StateInterface> Pi3HatControlHardware::export_state_interfaces()
 {
     std::vector<hardware_interface::StateInterface> state_interfaces;
@@ -157,6 +152,7 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_configure(
     return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+
 hardware_interface::CallbackReturn Pi3HatControlHardware::on_cleanup(
     const rclcpp_lifecycle::State & /*previous_state*/)
 {
@@ -220,9 +216,9 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
 
         if (control_modes_[i] == "position")  // Position control
         {
-            cmd.position = ((hw_command_positions_[i] / 2 * M_PI) * 4.5) + hw_actuator_position_offsets_[i];
-            cmd.velocity_limit = 2.0;
-            cmd.accel_limit = 3.0;
+            cmd.position = 0.0; //((hw_command_positions_[i] / 2 * M_PI) * 9.0) + hw_actuator_position_offsets_[i];
+            cmd.velocity_limit = 1.0;
+            cmd.accel_limit = 1.0;
         }
         else if (control_modes_[i] == "effort")  // Effort control
         {
@@ -256,8 +252,8 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
 
                 if (control_modes_[i] == "position")
                 {
-                    p_des = ((v.position - hw_actuator_position_offsets_[i])/4.5) * 2 * M_PI;
-                    v_des = (v.velocity)/4.5;
+                    p_des = ((v.position - hw_actuator_position_offsets_[i])/9.0) * 2 * M_PI;
+                    v_des = (v.velocity)/9;
                 }
                 else{
                     p_des = v.position;

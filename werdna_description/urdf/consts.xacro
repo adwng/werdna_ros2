@@ -58,7 +58,7 @@
 
     <xacro:property name="chassis_mass" value="1.5"/>
     <xacro:property name="rod_mass" value="0.1"/>
-    <xacro:property name="knee_rod_mass" value="0.2"/>
+    <xacro:property name="knee_rod_mass" value="0.1"/>
     <xacro:property name="wheel_mass" value="0.5"/>
     <xacro:property name="motor_mass" value="0.3"/>
     <xacro:property name="gearbox_mass" value="0.3"/>

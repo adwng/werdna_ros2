@@ -39,11 +39,6 @@ PUBLIC
 target_compile_features(
     pi3hat_hardware_interface PUBLIC cxx_std_17)
 
-ament_target_dependencies(
-  pi3hat_hardware_interface PUBLIC
-  ${THIS_PACKAGE_INCLUDE_DEPENDS}
-)
-
 # Causes the visibility macros to use dllexport rather than dllimport,
 # which is appropriate when building the dll but not consuming it.
 target_compile_definitions(${PROJECT_NAME} PRIVATE "PI3HAT_HARDWARE_INTERFACE_BUILDING_DLL")
@@ -63,20 +58,34 @@ target_include_directories(pi3hat
 target_compile_features(
       pi3hat PUBLIC cxx_std_17)
 
+target_link_libraries(
+  pi3hat_hardware_interface
+  PUBLIC pi3hat
+  PUBLIC bcm_host
+)
+
+ament_target_dependencies(
+  pi3hat_hardware_interface PUBLIC
+  ${THIS_PACKAGE_INCLUDE_DEPENDS}
+)
+
 # Export hardware plugins
 pluginlib_export_plugin_description_file(hardware_interface pi3hat_hardware_interface.xml)
 
-# INSTALL
-install(
-  DIRECTORY hardware/include/
-  DESTINATION include/pi3hat_hardware_interface
-)
-
-install(TARGETS pi3hat_hardware_interface
-  EXPORT export_pi3hat_hardware_interface
+## Install
+install(TARGETS 
+  ${PROJECT_NAME}
+  pi3hat
+  
+  EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
+)
+
+install(
+  DIRECTORY hardware/include/
+  DESTINATION hardware/include/
 )
 
 if(BUILD_TESTING)
@@ -84,6 +93,7 @@ if(BUILD_TESTING)
 endif()
 
 ## EXPORTS
+ament_export_include_directories(include)
 ament_export_targets(export_pi3hat_hardware_interface HAS_LIBRARY_TARGET)
 ament_export_dependencies(${THIS_PACKAGE_INCLUDE_DEPENDS})
 ament_package()
