@@ -17,10 +17,6 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 > Will be switching the agent to be implemented using onxx to avoid issues with real time control loop when inferencing with torch
 > Rewriting the hardware interface to use the c++ bindings with the moteus c++ libraries.
 
-> [!IMPORTANT]
-> The pi3hat hardware interface is not tested yet and is written with more relevance to my implementation, may edit to suit your own needs.
-> It does not make use of the IMU on board.
-
 
 <details>
   <summary>Dependencies</summary>
@@ -45,16 +41,18 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 |`werdna_agent`|Node to run trained agent inference|
 |`werdna_odometry_broadcaster`|Broadcaster for Odometry|
 
-### Raspberry Pi Required Contents
-|_Packages_|_Functionality_|
-| -------- | ------------- |
-|[MPU6050 Driver](https://github.com/kimsniper/ros2_mpu6050)|Driver Node to interface MPU6050 with RPI4|
-
 ## Code Run
 **Launch in Base**
+|`CAPTCHAS`|Explanation|
+|----------|-----------|
+|Super User Mode|Ensure Super User Mode, Since the pi3hat requires root access to use the GPIO pins|
+|UDP Memory Switch|Force FastDDS to use UDP instead of shared memory|
+
 ```
-cd <your_ws>
-source install/setup.zsh #or setup.bash (I use zsh anyways)
+sudo bash
+export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/pi3hat_hardware_interface/fastrtps_profile_no_shmem.xml
+source /opt/ros/humble/setup.bash
+source werdna_ws/install/setup.bash
 ros2 launch bringup launch_robot.py
 ```
 

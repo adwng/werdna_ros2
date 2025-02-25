@@ -78,11 +78,22 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
             options.position_format.kp_scale = mjbots::moteus::kInt8;
             options.position_format.kd_scale = mjbots::moteus::kInt8;
         }
+        else if (control_modes_[i] == "position")
+        {
+            options.position_format.velocity_limit = mjbots::moteus::kFloat;
+            options.position_format.accel_limit = mjbots::moteus::kFloat;
+        }
 
         controllers.push_back(
             std::make_shared<mjbots::moteus::Controller>(options)
         );
     }
+
+    for (auto& c:controllers){c->SetStop();}
+
+    return hardware_interface::CallbackReturn::SUCCESS;
+
+}
 
     // Clear Faults
 std::vector<hardware_interface::StateInterface> Pi3HatControlHardware::export_state_interfaces()
@@ -263,15 +274,15 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
                 hw_state_positions_[i] = p_des;
                 hw_state_velocities_[i] = v_des;
 
-                RCLCPP_INFO(
-                    rclcpp::get_logger("Pi3HatControlHardware"),
-                    "Joint: %s, Command Type: %s, Command: %.3f, Position: %.3f, Velocity: %.3f",
-                    info_.joints[i].name.c_str(),
-                    control_modes_[i].c_str(),
-                    (control_modes_[i] == "position") ? hw_command_positions_[i] : hw_command_efforts_[i],
-                    hw_state_positions_[i],
-                    hw_state_velocities_[i]
-                );
+                // RCLCPP_INFO(
+                //     rclcpp::get_logger("Pi3HatControlHardware"),
+                //     "Joint: %s, Command Type: %s, Command: %.3f, Position: %.3f, Velocity: %.3f",
+                //     info_.joints[i].name.c_str(),
+                //     control_modes_[i].c_str(),
+                //     (control_modes_[i] == "position") ? hw_command_positions_[i] : hw_command_efforts_[i],
+                //     hw_state_positions_[i],
+                //     hw_state_velocities_[i]
+                // );
             }
         }
     }

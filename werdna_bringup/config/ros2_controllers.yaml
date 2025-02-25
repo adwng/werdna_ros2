@@ -20,9 +20,9 @@ position_controller:
   ros__parameters:
     joints:
       - left_hip_motor_joint
-      - left_knee_motor_joint
+      - left_knee_joint
       - right_hip_motor_joint
-      - right_knee_motor_joint
+      - right_knee_joint
 
 wheel_controller:
   ros__parameters:
