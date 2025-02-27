@@ -292,7 +292,7 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
     //     &receive_frames
     // );
     
-    transport->Cycle(&send_frames[0], send_frames.size(), &receive_frames, &attitude, nullptr, nullptr, cbk.callback());
+    transport->Cycle(send_frames.data(), send_frames.size(), &receive_frames, &attitude, nullptr, nullptr, cbk.callback());
 
     cbk.Wait();
 
@@ -336,17 +336,19 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
         }
     }
 
+    auto a = attitude;
+
     //Processing Attitude
-    hw_state_imu_orientation_[0] = attitude.attitude.w;
-    hw_state_imu_orientation_[1] = attitude.attitude.z;
-    hw_state_imu_orientation_[2] = attitude.attitude.y;
-    hw_state_imu_orientation_[3] = attitude.attitude.x;
-    hw_state_imu_angular_velocity_[0] = attitude.rate_dps.x * DEG_TO_RAD;
-    hw_state_imu_angular_velocity_[1] = attitude.rate_dps.y * DEG_TO_RAD;
-    hw_state_imu_angular_velocity_[2] = attitude.rate_dps.z * DEG_TO_RAD;
-    hw_state_imu_linear_acceleration_[0] = attitude.accel_mps2.x;
-    hw_state_imu_linear_acceleration_[1] = attitude.accel_mps2.y;
-    hw_state_imu_linear_acceleration_[2] = attitude.accel_mps2.z;
+    hw_state_imu_orientation_[0] = a.attitude.w;
+    hw_state_imu_orientation_[1] = a.attitude.z;
+    hw_state_imu_orientation_[2] = a.attitude.y;
+    hw_state_imu_orientation_[3] = a.attitude.x;
+    hw_state_imu_angular_velocity_[0] = a.rate_dps.x * DEG_TO_RAD;
+    hw_state_imu_angular_velocity_[1] = a.rate_dps.y * DEG_TO_RAD;
+    hw_state_imu_angular_velocity_[2] = a.rate_dps.z * DEG_TO_RAD;
+    hw_state_imu_linear_acceleration_[0] = a.accel_mps2.x;
+    hw_state_imu_linear_acceleration_[1] = a.accel_mps2.y;
+    hw_state_imu_linear_acceleration_[2] = a.accel_mps2.z;
 
     RCLCPP_INFO(
         rclcpp::get_logger("Pi3HatControlHardware"),
