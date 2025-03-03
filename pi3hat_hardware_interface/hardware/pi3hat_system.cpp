@@ -67,9 +67,9 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
     // toptions.default_input.wait_for_attitude = true;
     // toptions.default_input.attitude = &attitude;
 
-    toptions.mounting_deg.pitch = std::stod(info_.hardware_parameters.at("imu_mounting_deg.pitch"));
-    toptions.mounting_deg.yaw = std::stod(info_.hardware_parameters.at("imu_mounting_deg.yaw"));
-    toptions.mounting_deg.roll = std::stod(info_.hardware_parameters.at("imu_mounting_deg.roll"));
+    toptions.mounting_deg.pitch = 0;
+    toptions.mounting_deg.yaw = 0;
+    toptions.mounting_deg.roll = 0;
 
     // Create the transport with the populated options
     transport = std::make_shared<Transport>(toptions);
@@ -291,6 +291,11 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
     //     &send_frames[0], send_frames.size(),
     //     &receive_frames
     // );
+
+    /*MUST PUT THIS HERE!!!!*/
+    mjbots::moteus::BlockingCallback cbk;
+
+    // transport->BlockingCycle(send_frames.data(), send_frames.size(), &receive_frames);
     
     transport->Cycle(send_frames.data(), send_frames.size(), &receive_frames, &attitude, nullptr, nullptr, cbk.callback());
 

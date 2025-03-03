@@ -85,7 +85,6 @@ private:
     std::vector<mjbots::moteus::CanFdFrame> receive_frames;
 
     //Callbaks
-    mjbots::moteus::BlockingCallback cbk;
     
     // Actuator CAN config
     std::vector<int> hw_actuator_can_channels_;
