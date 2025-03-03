@@ -43,6 +43,7 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 |----------|-----------|
 |***Super User Mode***|Ensure Super User Mode, Since the pi3hat requires root access to use the GPIO pins|
 |***UDP Memory Switch***|Force FastDDS to use UDP instead of shared memory|
+|***Watchdog Timer***|Increase the watchdog timer for each servo to at least 0.5s to avoid mode 11 timeout bug|
 
 ```
 sudo bash

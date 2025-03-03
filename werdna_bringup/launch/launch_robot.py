@@ -14,13 +14,11 @@ def generate_launch_description():
     description_prefix = get_package_share_directory("werdna_description")
     teleop_prefix = get_package_share_directory("werdna_teleop")
     agent_prefix = get_package_share_directory("werdna_agent")
-    imu_prefix = get_package_share_directory("ros2_mpu6050_")
 
     teleop_launch_file = os.path.join(teleop_prefix, "launch", "werdna_teleop.launch.py")
 
     ros2_control_launch_file = os.path.join(description_prefix, "launch", "ros2_control.launch.py")
 
-    imu_launch_file = os.path.join(imu_prefix, "launch", "ros2_mpu6050.launch.py")
 
     teleop = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(teleop_launch_file),
@@ -28,10 +26,6 @@ def generate_launch_description():
 
     ros2_control = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(ros2_control_launch_file)
-    )
-
-    imu = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(imu_launch_file)
     )
     
     agent_node = Node(
@@ -42,7 +36,5 @@ def generate_launch_description():
     return LaunchDescription([
         teleop,
         ros2_control,
-        # odometry_node,
         agent_node,
-        imu,
     ])

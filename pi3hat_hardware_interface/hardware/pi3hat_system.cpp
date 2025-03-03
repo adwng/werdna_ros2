@@ -5,6 +5,9 @@
 #include <limits>
 #include <memory>
 #include <vector>
+#include <unordered_set>
+#include <sched.h>
+#include <sys/mman.h>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -37,6 +40,40 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
         control_modes_.push_back(joint.parameters.at("control_mode"));
     }
 
+    // onInit() -> Configure realtime scheduling
+    {
+        int realtime_cpu1 = 0; // first core
+        int realtime_cpu2 = 1; // second core
+        cpu_set_t cpuset = {};
+        CPU_ZERO(&cpuset);
+        CPU_SET(realtime_cpu1, &cpuset); // set first core
+        CPU_SET(realtime_cpu2, &cpuset); // set second core
+
+        const int r = ::sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+        if (r < 0)
+        {
+            throw std::runtime_error("Error setting CPU affinity");
+        }
+
+        std::cout << "Affinity set to CPUs " << realtime_cpu1 << " and " << realtime_cpu2 << "\n";
+    }
+    {
+        struct sched_param params = {};
+        params.sched_priority = 10;
+        const int r = ::sched_setscheduler(0, SCHED_RR, &params);
+        if (r < 0)
+        {
+            throw std::runtime_error("Error setting realtime scheduler");
+        }
+    }
+    {
+        const int r = ::mlockall(MCL_CURRENT | MCL_FUTURE);
+        if (r < 0)
+        {
+            throw std::runtime_error("Error locking memory");
+        }
+    }
+
     Transport::Options toptions;
     
     // Create a map to store CAN channel -> list of CAN IDs
@@ -63,9 +100,6 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
 
     // Configure IMU Settings Here
     toptions.attitude_rate_hz = 100;
-    // toptions.default_input.request_attitude = true;
-    // toptions.default_input.wait_for_attitude = true;
-    // toptions.default_input.attitude = &attitude;
 
     toptions.mounting_deg.pitch = 0;
     toptions.mounting_deg.yaw = 0;
@@ -89,6 +123,7 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
         }
         else if (control_modes_[i] == "position")
         {
+            options.position_format.position = mjbots::moteus::kFloat;
             options.position_format.velocity_limit = mjbots::moteus::kFloat;
             options.position_format.accel_limit = mjbots::moteus::kFloat;
         }
@@ -98,7 +133,21 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
         );
     }
 
-    for (auto& c:controllers){c->SetStop();}
+    for (auto& c:controllers){
+        int fault = c->SetStop()->values.fault;
+
+        if (fault != 0)
+        {
+            RCLCPP_INFO(rclcpp::get_logger("Pi3hatControlhardware"), "Controller with id: %d reported fault: %d", c->options().id, fault);
+
+            return hardware_interface::CallbackReturn::ERROR;
+        }
+        else
+        {
+            RCLCPP_INFO(rclcpp::get_logger("Pi3HatControlHardware"), "Motor: %d Stopped", c->options().id);
+        }
+    
+    }
 
     return hardware_interface::CallbackReturn::SUCCESS;
 
@@ -178,15 +227,15 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_configure(
      // reset values always when configuring hardware
      for (uint i = 0; i < hw_state_positions_.size(); i++)
      {
-         hw_state_positions_[i] = 0;
-         hw_state_velocities_[i] = 0;
-         if (control_modes_[i] == "position")
+        hw_state_positions_[i] = 0;
+        hw_state_velocities_[i] = 0;
+        if (control_modes_[i] == "position")
         {
-            hw_command_positions_[i] = 0;
+            hw_command_positions_[i] = 0.0;
         }
         else if (control_modes_[i] == "effort")
         {
-            hw_command_efforts_[i] = 0;
+            hw_command_efforts_[i] = 0.0;
         }
      }
 
@@ -206,8 +255,6 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_cleanup(
 hardware_interface::CallbackReturn Pi3HatControlHardware::on_activate(
     const rclcpp_lifecycle::State & /*previous_state*/)
 {
-    // attitude = {};
-
     
     RCLCPP_INFO(rclcpp::get_logger("Pi3HatControlHardware"), "Successfully activated!");
     return hardware_interface::CallbackReturn::SUCCESS;
@@ -217,7 +264,7 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_deactivate(
     const rclcpp_lifecycle::State & /*previous_state*/)
 {
     // Clear Faults
-    for (auto& c:controllers){ c->SetBrake(); }
+    for (auto& c:controllers){ c->SetStop(); }
     
     RCLCPP_INFO(rclcpp::get_logger("Pi3HatControlHardware"), "Successfully deactivated!");
 
@@ -264,9 +311,10 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
         if (control_modes_[i] == "position")  // Position control
         {
             computed_cmd = ((hw_command_positions_[i] / (2 * M_PI)) * 9.0) + hw_actuator_position_offsets_[i];
-            cmd.position = 0.0f; //((hw_command_positions_[i] / (2 * M_PI)) * 9.0) + hw_actuator_position_offsets_[i];
-            cmd.velocity_limit = 1.0f;
-            cmd.accel_limit = 2.0f;
+            cmd.position = computed_cmd; 
+            cmd.velocity = 0.0;
+            cmd.velocity_limit = 2.0;
+            cmd.accel_limit = 3.0;
         }
         else if (control_modes_[i] == "effort")  // Effort control
         {
@@ -274,14 +322,6 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
             cmd.kd_scale = 0.0f;
             cmd.feedforward_torque = hw_command_efforts_[i];
         }
-
-        RCLCPP_INFO(
-            rclcpp::get_logger("Pi3HatControlHardware"),
-            "Joint: %s, Command Type: %s, Command: %.3f",
-            info_.joints[i].name.c_str(),
-            control_modes_[i].c_str(),
-            (control_modes_[i] == "position") ? computed_cmd : hw_command_efforts_[i]
-        );
 
         send_frames.push_back(controllers[i]->MakePosition(cmd));
     }
@@ -294,10 +334,8 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
 
     /*MUST PUT THIS HERE!!!!*/
     mjbots::moteus::BlockingCallback cbk;
-
-    // transport->BlockingCycle(send_frames.data(), send_frames.size(), &receive_frames);
     
-    transport->Cycle(send_frames.data(), send_frames.size(), &receive_frames, &attitude, nullptr, nullptr, cbk.callback());
+    transport->Cycle(&send_frames[0], send_frames.size(), &receive_frames, &attitude, nullptr, nullptr, cbk.callback());
 
     cbk.Wait();
 
@@ -330,12 +368,14 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
 
                 RCLCPP_INFO(
                     rclcpp::get_logger("Pi3HatControlHardware"),
-                    "Joint: %s, Command Type: %s, Command: %.3f, Position: %.3f, Velocity: %.3f",
+                    "Joint: %s, Command Type: %s, Mode: %2d, Command: %.3f, Position: %.3f, Velocity: %.3f, Fault:\r",
                     info_.joints[i].name.c_str(),
                     control_modes_[i].c_str(),
+                    static_cast<int>(v.mode),
                     (control_modes_[i] == "position") ? hw_command_positions_[i] : hw_command_efforts_[i],
                     hw_state_positions_[i],
-                    hw_state_velocities_[i]
+                    hw_state_velocities_[i],
+                    v.fault
                 );
             }
         }
@@ -355,12 +395,11 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
     hw_state_imu_linear_acceleration_[1] = a.accel_mps2.y;
     hw_state_imu_linear_acceleration_[2] = a.accel_mps2.z;
 
-    RCLCPP_INFO(
-        rclcpp::get_logger("Pi3HatControlHardware"),
-        "Attitude x:%.3f, Attitude y: %.3f, Attitude z:%.3f, Attitude w:%.3f",
-        attitude.attitude.x, attitude.attitude.y, attitude.attitude.z, attitude.attitude.w
-    );
-
+    // RCLCPP_INFO(
+    //     rclcpp::get_logger("Pi3HatControlHardware"),
+    //     "Attitude x:%.3f, Attitude y: %.3f, Attitude z:%.3f, Attitude w:%.3f",
+    //     attitude.attitude.x, attitude.attitude.y, attitude.attitude.z, attitude.attitude.w
+    // );
 
     return hardware_interface::return_type::OK;
 }

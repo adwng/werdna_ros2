@@ -2,4 +2,5 @@
 log/
 werdna_hardware_interface/
 werdna_odometry/
+simple_position_controller/
 .ssh_config_raspberrypi.txt
