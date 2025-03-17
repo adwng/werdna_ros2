@@ -36,11 +36,8 @@
     <xacro:property name="wheel_radius" value="0.06"/>
     <xacro:property name="wheel_length" value="0.02"/>
 
-    <xacro:property name="motor_radius" value="0.04"/>
-    <xacro:property name="motor_thickness" value="0.035"/>
-
-    <xacro:property name="gearbox_radius" value="0.04"/>
-    <xacro:property name="gearbox_thickness" value="0.042"/>
+    <xacro:property name="gearbox_radius" value="0.055"/>
+    <xacro:property name="gearbox_thickness" value="0.0738"/>
 
     <xacro:property name="imu_length" value="0.01"/>
     <xacro:property name="imu_width" value="0.01"/> 
@@ -50,17 +47,11 @@
     <xacro:property name="rod_width" value="0.02"/> 
     <xacro:property name="rod_height" value="0.148"/>
 
-    <xacro:property name="knee_rod_length" value="0.035"/>
-    <xacro:property name="knee_rod_width" value="0.02"/> 
-    <xacro:property name="knee_rod_height" value="0.148"/>
-
     <!-- Masses -->
 
-    <xacro:property name="chassis_mass" value="1.5"/>
+    <xacro:property name="chassis_mass" value="2.0"/>
     <xacro:property name="rod_mass" value="0.1"/>
-    <xacro:property name="knee_rod_mass" value="0.1"/>
     <xacro:property name="wheel_mass" value="0.5"/>
-    <xacro:property name="motor_mass" value="0.3"/>
     <xacro:property name="gearbox_mass" value="0.3"/>
     <xacro:property name="imu_mass" value="0.001"/>
 
@@ -72,15 +63,11 @@
 
     <xacro:property name="imu_offset_x" value="0"/>
     <xacro:property name="imu_offset_y" value="0"/>
-    <xacro:property name="imu_offset_z" value="${chassis_height/2 + imu_height/2}"/>
+    <xacro:property name="imu_offset_z" value="0"/>
 
     <xacro:property name="gearbox_offset_x" value="0"/>
     <xacro:property name="gearbox_offset_y" value="${chassis_width/2 + gearbox_thickness/2}"/>
     <xacro:property name="gearbox_offset_z" value="0"/>
-
-    <xacro:property name="motor_offset_x" value="${-rod_height}"/>
-    <xacro:property name="motor_offset_y" value="0"/>
-    <xacro:property name="motor_offset_z" value="${motor_thickness/2 + rod_length/2}"/>
 
     <xacro:property name="hip_offset_x" value="${-rod_height}"/>
     <xacro:property name="hip_offset_y" value="0"/>

@@ -5,8 +5,6 @@
     <xacro:include filename="consts.xacro"/>  
     <xacro:include filename='inertial_macros.xacro'/>
 
-    <!-- Base Link -->
-
     <!-- Chassis -->
     <link name="base_link">
         <xacro:inertial_box mass="${chassis_mass}" x="${chassis_length}" y="${chassis_width}" z="${chassis_height}">
@@ -29,32 +27,14 @@
     </link>
 
     <!-- imu -->
-    <link name="imu_link">
-        <xacro:inertial_box mass="${imu_mass}" x="${imu_length}" y="${imu_width}" z="${imu_height}">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-        </xacro:inertial_box>
-        <visual>
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
-            <geometry>
-                <box size="${imu_length} ${imu_width} ${imu_height}"/>
-            </geometry>
-            <material name="white"/>
-        </visual>
-        <collision>
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
-            <geometry>
-                <box size="${imu_length} ${imu_width} ${imu_height}"/>
-            </geometry>
-            <material name="white"/>
-        </collision>
-    </link>
+    <!-- <link name="imu_link"></link> -->
 
     <!-- imu joint -->
-    <joint name="imu_joint" type="fixed">
+    <!-- <joint name="imu_joint" type="fixed">
         <origin xyz="${imu_offset_x} ${imu_offset_y} ${imu_offset_z}" rpy="0.0 0.0 0.0"/>
         <parent link="base_link"/>
         <child link="imu_link"/>
-    </joint>
+    </joint> -->
 
     <!-- Left Hip - Gearbox -->
     <link name="left_hip_motor_link">
@@ -78,155 +58,93 @@
     </link>
 
     <joint name="left_hip_motor_joint" type="revolute">
-        <origin xyz="0.0 ${gearbox_offset_y} 0.0" rpy="${pi/2} -0.524 0.0"/>
+        <origin xyz="0.0 ${gearbox_offset_y} 0.0" rpy="${pi/2} -${pi/6} 0.0"/>
         <parent link="base_link"/>
         <child link="left_hip_motor_link"/>
         <axis xyz="0.0 0.0 1.0"/>
         <limit lower="${low_limit}" upper="${high_limit}" velocity="${velocity}" effort="${effort}"/>
     </joint>
 
-    <!-- Left Hip - Hip -->
     <link name="left_hip_link">
         <visual>
-            <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
+             <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
             <geometry>
-                <box size="${rod_length} ${rod_width} ${rod_height}"/>
+                <box size="${rod_length} ${rod_width} ${rod_height}" rpy="0 0 0"/>
             </geometry>
             <material name="red"/>
         </visual>
         <collision>
-            <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
+             <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
             <geometry>
-                <box size="${rod_length} ${rod_width} ${rod_height}"/>
+                <box size="${rod_length} ${rod_width} ${rod_height}" rpy="0 0 0"/>
             </geometry>
             <material name="red"/>
         </collision>
         <xacro:inertial_box mass="${rod_mass}" x="${rod_length}" y="${rod_width}" z="${rod_height}">
-            <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
+             <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
         </xacro:inertial_box>
     </link>
 
     <joint name="left_hip_joint" type="fixed">
-        <origin xyz="0.0 0.0 -${hip_offset_z}" rpy="0.0 0.0 0.0"/>
+        <origin xyz="0.0 0 -${gearbox_thickness/2 + rod_length/2}" rpy="0 0 0"/>
         <parent link="left_hip_motor_link"/>
         <child link="left_hip_link"/>
     </joint>
 
-    <!-- Left Knee - Motor -->
-    <link name="left_knee_motor_link">
+    <link name="left_knee_link">
         <visual>
-            <origin xyz="${rod_height} 0 0" rpy="0 0 0"/>
+             <origin xyz="0 0 ${rod_height/2}" rpy="0.0 0 ${pi/2}"/>
             <geometry>
-                <cylinder radius="${motor_radius}" length="${motor_thickness}"/>
+                <box size="${rod_length} ${rod_width} ${rod_height}" rpy="0 0 0"/>
             </geometry>
             <material name="red"/>
         </visual>
         <collision>
-            <origin xyz="${rod_height} 0 0" rpy="0 0 0"/>
+             <origin xyz="0 0 ${rod_height/2}" rpy="0 0 ${pi/2}"/>
             <geometry>
-                <cylinder radius="${motor_radius}" length="${motor_thickness}"/>
-            </geometry>
-            <material name="red"/>
-        </collision>
-        <xacro:inertial_cylinder mass="${motor_mass}" length="${motor_thickness}" radius="${motor_radius}">
-            <origin xyz="${rod_height} 0 0" rpy="0 0 0"/>
-        </xacro:inertial_cylinder>
-    </link>
-
-    <joint name="left_knee_motor_joint" type="fixed">
-        <origin xyz="${motor_offset_x} 0 -${motor_offset_z}" rpy="0.0 0 0"/>
-        <parent link="left_hip_link"/>
-        <child link="left_knee_motor_link"/>
-        
-    </joint>
-
-    <!-- Left Hip - Link Outer-->
-    <link name="left_knee_outer_link">
-        <visual>
-            <origin xyz="0 0 ${rod_height/2}" rpy="0 0 0"/>
-            <geometry>
-                <box size="${rod_length} ${rod_width} ${rod_height}"/>
-            </geometry>
-            <material name="red"/>
-        </visual>
-        <collision>
-            <origin xyz="0 0 ${rod_height/2}" rpy="0 0 0"/>
-            <geometry>
-                <box size="${rod_length} ${rod_width} ${rod_height}"/>
+                <box size="${rod_length} ${rod_width} ${rod_height}" rpy="0 0 0"/>
             </geometry>
             <material name="red"/>
         </collision>
         <xacro:inertial_box mass="${rod_mass}" x="${rod_length}" y="${rod_width}" z="${rod_height}">
-            <origin xyz="0 0 ${rod_height/2}" rpy="0 0 0"/>
-        </xacro:inertial_box>
-    </link>
-
-    <joint name="left_knee_outer_joint" type="fixed">
-        <origin xyz="0 0 -${rod_length/2 + motor_thickness/2}" rpy="0.0 ${pi/2} 0.0"/>
-        <parent link="left_knee_motor_link"/>
-        <child link="left_knee_outer_link"/>
-    </joint>
-
-    <!-- Left Knee - Link -->
-    <link name="left_knee_link">
-        <visual>
-            <origin xyz="0 0 ${knee_rod_height/2}" rpy="0 0 0"/>
-            <geometry>
-                <box size="${knee_rod_length} ${knee_rod_width} ${knee_rod_height}"/>
-            </geometry>
-            <material name="red"/>
-        </visual>
-        <collision>
-            <origin xyz="0 0 ${knee_rod_height/2}" rpy="0 0 0"/>
-            <geometry>
-                <box size="${knee_rod_length} ${knee_rod_width} ${knee_rod_height}"/>
-            </geometry>
-            <material name="red"/>
-        </collision>
-        <xacro:inertial_box mass="${knee_rod_mass}" x="${knee_rod_length}" y="${knee_rod_width}" z="${knee_rod_height}">
-            <origin xyz="0 0 ${knee_rod_height/2}" rpy="0 0 0"/>
+             <origin xyz="0 0 ${rod_height/2}" rpy="0 0 ${pi/2}"/>
         </xacro:inertial_box>
     </link>
 
     <joint name="left_knee_joint" type="revolute">
-        <origin xyz="0 0 0" rpy="0.0 ${pi/2} -1.047"/>
-        <parent link="left_knee_motor_link"/>
+        <origin xyz="-${rod_height} 0 0" rpy="${pi/2} 0 ${pi/6}"/>
+        <parent link="left_hip_link"/>
         <child link="left_knee_link"/>
-        <axis xyz="1.0 0.0 0.0"/>
+        <axis xyz="0.0 -1.0 0.0"/>
         <limit lower="${low_limit}" upper="${high_limit}" velocity="${velocity}" effort="${effort}"/>
     </joint>
 
-    <!-- Left Wheel -->
-    <link name="left_wheel">
+    <link name="left_wheel_link">
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <geometry>
                 <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
             </geometry>
-            <material name="black"/>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <geometry>
                 <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
             </geometry>
         </collision>
         <xacro:inertial_cylinder mass="${wheel_mass}" length="${wheel_length}" radius="${wheel_radius}">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
         </xacro:inertial_cylinder>
     </link>
 
     <joint name="left_wheel_joint" type="continuous">
-      <origin xyz="${wheel_offset_x} 0 ${wheel_offset_z}" rpy="0 ${pi/2} 0"/>
-      <parent link="left_knee_link"/>
-      <child link="left_wheel"/>
-      <axis xyz="0.0 0.0 1.0"/>
+        <parent link="left_knee_link"/>
+        <child link="left_wheel_link"/>
+        <origin xyz="0 -${rod_length/2 + wheel_length/2} ${rod_height}" rpy="${pi/2} 0.0 0.0"/>
+        <axis xyz="0.0 0.0 1.0"/>
     </joint>
 
-
-
-
-    <!-- Right Hip - Gearbox -->
+        <!-- Right Hip - Gearbox -->
     <link name="right_hip_motor_link">
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -248,150 +166,90 @@
     </link>
 
     <joint name="right_hip_motor_joint" type="revolute">
-        <origin xyz="0.0 -${gearbox_offset_y} 0.0" rpy="${pi/2} -0.524 0.0"/>
+        <origin xyz="0.0 -${gearbox_offset_y} 0.0" rpy="${pi/2} -${pi/6} 0.0"/>
         <parent link="base_link"/>
         <child link="right_hip_motor_link"/>
         <axis xyz="0.0 0.0 1.0"/>
         <limit lower="${low_limit}" upper="${high_limit}" velocity="${velocity}" effort="${effort}"/>
     </joint>
 
-    <!-- Right Hip - Hip -->
     <link name="right_hip_link">
         <visual>
-            <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
+             <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
             <geometry>
-                <box size="${rod_length} ${rod_width} ${rod_height}"/>
+                <box size="${rod_length} ${rod_width} ${rod_height}" rpy="0 0 0"/>
             </geometry>
             <material name="red"/>
         </visual>
         <collision>
-            <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
+             <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
             <geometry>
-                <box size="${rod_length} ${rod_width} ${rod_height}"/>
+                <box size="${rod_length} ${rod_width} ${rod_height}" rpy="0 0 0"/>
             </geometry>
             <material name="red"/>
         </collision>
         <xacro:inertial_box mass="${rod_mass}" x="${rod_length}" y="${rod_width}" z="${rod_height}">
-            <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
+             <origin xyz="-${rod_height/2} 0 0" rpy="0 ${pi/2} 0"/>
         </xacro:inertial_box>
     </link>
 
     <joint name="right_hip_joint" type="fixed">
-        <origin xyz="0.0 0.0 ${hip_offset_z}" rpy="0.0 0.0 0.0"/>
+        <origin xyz="0.0 0 ${gearbox_thickness/2 + rod_length/2}" rpy="0 0 0"/>
         <parent link="right_hip_motor_link"/>
         <child link="right_hip_link"/>
     </joint>
 
-    <!-- right Knee - Motor -->
-    <link name="right_knee_motor_link">
+    <link name="right_knee_link">
         <visual>
-            <origin xyz="${rod_height} 0 0" rpy="0 0 0"/>
+             <origin xyz="0 0 ${rod_height/2}" rpy="0.0 0 ${pi/2}"/>
             <geometry>
-                <cylinder radius="${motor_radius}" length="${motor_thickness}"/>
+                <box size="${rod_length} ${rod_width} ${rod_height}" rpy="0 0 0"/>
             </geometry>
             <material name="red"/>
         </visual>
         <collision>
-            <origin xyz="${rod_height} 0 0" rpy="0 0 0"/>
+             <origin xyz="0 0 ${rod_height/2}" rpy="0 0 ${pi/2}"/>
             <geometry>
-                <cylinder radius="${motor_radius}" length="${motor_thickness}"/>
-            </geometry>
-            <material name="red"/>
-        </collision>
-        <xacro:inertial_cylinder mass="${motor_mass}" length="${motor_thickness}" radius="${motor_radius}">
-            <origin xyz="${rod_height} 0 0" rpy="0 0 0"/>
-        </xacro:inertial_cylinder>
-    </link>
-
-    <joint name="right_knee_motor_joint" type="fixed">
-        <origin xyz="${motor_offset_x} 0 ${motor_offset_z}" rpy="0.0 0 0"/>
-        <parent link="right_hip_link"/>
-        <child link="right_knee_motor_link"/>
-        
-    </joint>
-
-    <!-- Right Hip - Link Outer-->
-    <link name="right_knee_outer_link">
-        <visual>
-            <origin xyz="0 0 ${rod_height/2}" rpy="0 0 0"/>
-            <geometry>
-                <box size="${rod_length} ${rod_width} ${rod_height}"/>
-            </geometry>
-            <material name="red"/>
-        </visual>
-        <collision>
-            <origin xyz="0 0 ${rod_height/2}" rpy="0 0 0"/>
-            <geometry>
-                <box size="${rod_length} ${rod_width} ${rod_height}"/>
+                <box size="${rod_length} ${rod_width} ${rod_height}" rpy="0 0 0"/>
             </geometry>
             <material name="red"/>
         </collision>
         <xacro:inertial_box mass="${rod_mass}" x="${rod_length}" y="${rod_width}" z="${rod_height}">
-            <origin xyz="0 0 ${rod_height/2}" rpy="0 0 0"/>
-        </xacro:inertial_box>
-    </link>
-
-    <joint name="right_knee_outer_joint" type="fixed">
-        <origin xyz="0 0 ${rod_length/2 + motor_thickness/2}" rpy="0.0 ${pi/2} 0.0"/>
-        <parent link="right_knee_motor_link"/>
-        <child link="right_knee_outer_link"/>
-    </joint>
-
-    <!-- Right Knee - Link -->
-    <link name="right_knee_link">
-        <visual>
-            <origin xyz="0 0 ${knee_rod_height/2}" rpy="0 0 0"/>
-            <geometry>
-                <box size="${knee_rod_length} ${knee_rod_width} ${knee_rod_height}"/>
-            </geometry>
-            <material name="red"/>
-        </visual>
-        <collision>
-            <origin xyz="0 0 ${knee_rod_height/2}" rpy="0 0 0"/>
-            <geometry>
-                <box size="${knee_rod_length} ${knee_rod_width} ${knee_rod_height}"/>
-            </geometry>
-            <material name="red"/>
-        </collision>
-        <xacro:inertial_box mass="${knee_rod_mass}" x="${knee_rod_length}" y="${knee_rod_width}" z="${knee_rod_height}">
-            <origin xyz="0 0 ${knee_rod_height/2}" rpy="0 0 0"/>
+             <origin xyz="0 0 ${rod_height/2}" rpy="0 0 ${pi/2}"/>
         </xacro:inertial_box>
     </link>
 
     <joint name="right_knee_joint" type="revolute">
-        <origin xyz="0 0 0" rpy="0.0 ${pi/2} -1.047"/>
-        <parent link="right_knee_motor_link"/>
+        <origin xyz="-${rod_height} 0 0" rpy="${pi/2} 0 ${pi/6}"/>
+        <parent link="right_hip_link"/>
         <child link="right_knee_link"/>
-        <axis xyz="1.0 0.0 0.0"/>
+        <axis xyz="0.0 -1.0 0.0"/>
         <limit lower="${low_limit}" upper="${high_limit}" velocity="${velocity}" effort="${effort}"/>
     </joint>
 
-    <!-- Right Wheel -->
-    <link name="right_wheel">
+    <link name="right_wheel_link">
         <visual>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <geometry>
                 <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
             </geometry>
-            <material name="black"/>
         </visual>
         <collision>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <geometry>
                 <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
             </geometry>
         </collision>
         <xacro:inertial_cylinder mass="${wheel_mass}" length="${wheel_length}" radius="${wheel_radius}">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
         </xacro:inertial_cylinder>
     </link>
 
     <joint name="right_wheel_joint" type="continuous">
-      <origin xyz="-${wheel_offset_x} 0 ${wheel_offset_z}" rpy="0 ${pi/2} 0"/>
-      <parent link="right_knee_link"/>
-      <child link="right_wheel"/>
-      <axis xyz="0.0 0.0 1.0"/>
+        <parent link="right_knee_link"/>
+        <child link="right_wheel_link"/>
+        <origin xyz="0 ${rod_length/2 + wheel_length/2} ${rod_height}" rpy="${pi/2} 0.0 0.0"/>
+        <axis xyz="0.0 0.0 1.0"/>
     </joint>
-
-
+    
 </robot>
