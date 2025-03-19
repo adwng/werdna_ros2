@@ -80,8 +80,8 @@ def generate_launch_description():
     # Delay start of wheel_controller after "robot controller"
     delay_wheel_controller_spawner_after_robot_controller_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
-            target_action=wheel_controller_spawner,
-            on_exit=[robot_controller_spawner],
+            target_action=robot_controller_spawner,
+            on_exit=[wheel_controller_spawner],
         )
     )
 
@@ -97,7 +97,7 @@ def generate_launch_description():
         control_node,
         joint_state_broadcaster_spawner,
         delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
-        # delay_wheel_controller_spawner_after_robot_controller_spawner,
+        delay_wheel_controller_spawner_after_robot_controller_spawner,
         # delay_odometry_broadcaster_spawner_after_wheel_controller_spawner
     ]
 

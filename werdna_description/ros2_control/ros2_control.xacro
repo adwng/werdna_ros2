@@ -31,18 +31,18 @@
             <param name="control_mode">position</param>
         </joint>
 
-        <!-- <joint name="left_wheel_joint">
+        <joint name="left_wheel_joint">
             <command_interface name="effort"/>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
 
             <param name="can_channel">1</param>
             <param name="can_id">3</param>
-            <param name="position_offset">-0.1</param>
+            <param name="position_offset">0.0</param>
             <param name="control_mode">effort</param>
 
             
-        </joint> -->
+        </joint>
 
         <joint name="right_hip_motor_joint">
             <command_interface name="position"/>

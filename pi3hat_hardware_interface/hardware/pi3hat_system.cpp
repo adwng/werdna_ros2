@@ -366,17 +366,17 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
                 hw_state_positions_[i] = p_des;
                 hw_state_velocities_[i] = v_des;
 
-                RCLCPP_INFO(
-                    rclcpp::get_logger("Pi3HatControlHardware"),
-                    "Joint: %s, Command Type: %s, Mode: %2d, Command: %.3f, Position: %.3f, Velocity: %.3f, Fault:\r",
-                    info_.joints[i].name.c_str(),
-                    control_modes_[i].c_str(),
-                    static_cast<int>(v.mode),
-                    (control_modes_[i] == "position") ? hw_command_positions_[i] : hw_command_efforts_[i],
-                    hw_state_positions_[i],
-                    hw_state_velocities_[i],
-                    v.fault
-                );
+                // RCLCPP_INFO(
+                //     rclcpp::get_logger("Pi3HatControlHardware"),
+                //     "Joint: %s, Command Type: %s, Mode: %2d, Command: %.3f, Position: %.3f, Velocity: %.3f, Fault:\r",
+                //     info_.joints[i].name.c_str(),
+                //     control_modes_[i].c_str(),
+                //     static_cast<int>(v.mode),
+                //     (control_modes_[i] == "position") ? hw_command_positions_[i] : hw_command_efforts_[i],
+                //     hw_state_positions_[i],
+                //     hw_state_velocities_[i],
+                //     v.fault
+                // );
             }
         }
     }
