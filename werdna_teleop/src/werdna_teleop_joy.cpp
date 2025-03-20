@@ -57,15 +57,15 @@ private:
             control_command.angular.z = msg_joy->axes[0] * angular_scale; // Rotation left/right
         }        
 
-        auto logger = this->get_logger();
-        RCLCPP_INFO(
-            logger, 
-            "State: %s, Height: %.3f, Linear.x: %.3f, Angular.z: %.3f", 
-            control_command.state ? "true" : "false",
-            control_command.height, 
-            control_command.linear.x, 
-            control_command.angular.z
-        );
+        // auto logger = this->get_logger();
+        // RCLCPP_INFO(
+        //     logger, 
+        //     "State: %s, Height: %.3f, Linear.x: %.3f, Angular.z: %.3f", 
+        //     control_command.state ? "true" : "false",
+        //     control_command.height, 
+        //     control_command.linear.x, 
+        //     control_command.angular.z
+        // );
     }
 
     // Joystick callback function

@@ -11,12 +11,12 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools', 'stable-baselines3', 'gymnasium', 'numpy'],
+    install_requires=['setuptools'],
     zip_safe=True,
     maintainer='andrew',
     maintainer_email='andrewngcheewei@hotmail.com',
     description='TODO: Package description',
-    license='Apache 2.0',  # Replace with your actual license
+    license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [

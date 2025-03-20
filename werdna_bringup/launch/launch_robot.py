@@ -9,7 +9,7 @@ from launch.conditions import IfCondition
 def generate_launch_description():
 
 
-    # Launch teleop, MPU6050 driver, odometry, agent and robot hardware interface & controllers
+    # Launch teleop,agent and robot hardware interface 
 
     description_prefix = get_package_share_directory("werdna_description")
     teleop_prefix = get_package_share_directory("werdna_teleop")
@@ -30,11 +30,12 @@ def generate_launch_description():
     
     agent_node = Node(
         package=agent_prefix,
+        name="werdna_agent",
         executable="werdna_agent_node",
     )
     
     return LaunchDescription([
         teleop,
         ros2_control,
-        agent_node,
+        # agent_node,
     ])

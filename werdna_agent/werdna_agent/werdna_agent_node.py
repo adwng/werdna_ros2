@@ -6,8 +6,8 @@ from sensor_msgs.msg import Imu, JointState
 from nav_msgs.msg import Odometry
 from werdna_msgs.msg import JoyCtrlCmds
 
-import onnx
-import onnxruntime as ort
+# import onnx
+# import onnxruntime as ort
 from scipy.spatial.transform import Rotation as R
 
 import os
@@ -18,21 +18,21 @@ class ControlNode(Node):
         super().__init__("control_node")
 
         # Subscribers
-        self.imu_subscriber = self.create_subscription(Imu, '/imu', self.imu_callback, 10)
-        self.odom_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
-        self.joint_subscriber = self.create_subscription(JointState, '/joint_state', self.joint_callback, 10)
+        # self.imu_subscriber = self.create_subscription(Imu, '/imu', self.imu_callback, 10)
+        # self.odom_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+        # self.joint_subscriber = self.create_subscription(JointState, '/joint_state', self.joint_callback, 10)
         self.command_subscriber = self.create_subscription(JoyCtrlCmds, '/werdna_control', self.command_callback, 10)
 
         # Publishers
-        self.wheel_controller = self.create_publisher(Float64MultiArray, '/wheel_controller/commands', 10)
+        # self.wheel_controller = self.create_publisher(Float64MultiArray, '/wheel_controller/commands', 10)
         self.legs_controller = self.create_publisher(Float64MultiArray, "/position_controller/commands", 10)
 
-        self.model_file = "home/andrew/policy.onnx"
+        # self.model_file = "home/andrew/policy.onnx"
         
         # Load ONNX model
-        self.policy_session = ort.InferenceSession(self.model_file)
-        self.policy_input_names = [self.policy_session.get_inputs()[0].name]
-        self.policy_output_names = [self.policy_session.get_outputs()[0].name]
+        # self.policy_session = ort.InferenceSession(self.model_file)
+        # self.policy_input_names = [self.policy_session.get_inputs()[0].name]
+        # self.policy_output_names = [self.policy_session.get_outputs()[0].name]
 
         self.target_joints = ["left_hip_motor_joint", "left_knee_joint", "right_hip_motor_joint", "right_knee_joint"]
 
@@ -116,21 +116,23 @@ class ControlNode(Node):
         return obs
 
     def step(self, action):
-        self.previous_action = action
+        # self.previous_action = action
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
-        wheel_cmd = Float64MultiArray()
-        leg_cmd = Float64MultiArray()
+        self.get_logger().info(f"Hip Angle: {hip}, Knee Angle: {knee}")
+
+        # wheel_cmd = Float64MultiArray()
+        # leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        wheel_cmd.data = [action[0], action[1]]
+        # wheel_cmd.data = [action[0], action[1]]
         
         # Remaining actions control the leg joints
-        leg_cmd.data = [hip*4.5, knee*4.5, hip*4.5, knee*4.5]
+        # leg_cmd.data = [hip, knee, hip, knee]
         
-        self.wheel_controller.publish(wheel_cmd)
-        self.legs_controller.publish(leg_cmd)
+        # self.wheel_controller.publish(wheel_cmd)
+        # self.legs_controller.publish(leg_cmd)
 
     def command_callback(self, msg):
         self.height = msg.height
@@ -138,8 +140,9 @@ class ControlNode(Node):
         self.desired_angular_z = msg.angular.z 
 
         if msg.state:
-            obs = self.get_obs()
-            action = self.policy_session.run(self.policy_output_names, {self.policy_input_names[0]: obs.reshape(1, -1)})[0].flatten()
+            # obs = self.get_obs()
+            # action = self.policy_session.run(self.policy_output_names, {self.policy_input_names[0]: obs.reshape(1, -1)})[0].flatten()
+            action  = 0
             self.step(action)
             
 

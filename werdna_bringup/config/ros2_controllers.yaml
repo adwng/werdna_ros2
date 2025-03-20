@@ -37,7 +37,7 @@ odometry_broadcaster:
     left_wheel_names: left_wheel_joint
     right_wheel_names: right_wheel_joint
 
-    wheel_separation: 0.1542
+    wheel_separation: 0.3356
 
     wheel_radius: 0.06
     

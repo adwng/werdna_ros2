@@ -102,8 +102,8 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
     toptions.attitude_rate_hz = 100;
 
     toptions.mounting_deg.pitch = 0;
-    toptions.mounting_deg.yaw = 0;
-    toptions.mounting_deg.roll = 0;
+    toptions.mounting_deg.yaw = 90;
+    toptions.mounting_deg.roll = 90;
 
     // Create the transport with the populated options
     transport = std::make_shared<Transport>(toptions);
@@ -384,10 +384,10 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
     auto a = attitude;
 
     //Processing Attitude
-    hw_state_imu_orientation_[0] = a.attitude.w;
+    hw_state_imu_orientation_[0] = a.attitude.x;
     hw_state_imu_orientation_[1] = a.attitude.z;
     hw_state_imu_orientation_[2] = a.attitude.y;
-    hw_state_imu_orientation_[3] = a.attitude.x;
+    hw_state_imu_orientation_[3] = a.attitude.w;
     hw_state_imu_angular_velocity_[0] = a.rate_dps.x * DEG_TO_RAD;
     hw_state_imu_angular_velocity_[1] = a.rate_dps.y * DEG_TO_RAD;
     hw_state_imu_angular_velocity_[2] = a.rate_dps.z * DEG_TO_RAD;
