@@ -51,21 +51,31 @@ private:
 
         // Adjust height and commands if in active state
         if (control_command.state) {
-            control_command.height = (std::abs(1 - msg_joy->axes[4])) / 2 * max_height;
+            const double height_step = 0.001;  // Adjust height by 1 mm per button press
+
+            // Increase height (Button 4)
+            if (msg_joy->buttons[4]) {
+                control_command.height = std::min(control_command.height + height_step, max_height);
+            }
+
+            // Decrease height (Button 5)
+            if (msg_joy->buttons[5]) {
+                control_command.height = std::max(control_command.height - height_step, 0.0);
+            }
             // Map joystick axes to linear.x and angular.z
             control_command.linear.x = msg_joy->axes[1] * linear_scale;  // Forward/backward motion
             control_command.angular.z = msg_joy->axes[0] * angular_scale; // Rotation left/right
         }        
 
-        // auto logger = this->get_logger();
-        // RCLCPP_INFO(
-        //     logger, 
-        //     "State: %s, Height: %.3f, Linear.x: %.3f, Angular.z: %.3f", 
-        //     control_command.state ? "true" : "false",
-        //     control_command.height, 
-        //     control_command.linear.x, 
-        //     control_command.angular.z
-        // );
+        auto logger = this->get_logger();
+        RCLCPP_INFO(
+            logger, 
+            "State: %s, Height: %.3f, Linear.x: %.3f, Angular.z: %.3f", 
+            control_command.state ? "true" : "false",
+            control_command.height, 
+            control_command.linear.x, 
+            control_command.angular.z
+        );
     }
 
     // Joystick callback function
