@@ -147,12 +147,12 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
 
   z_ =(0.5 * (left_leg_length + right_leg_length));
 
-  // Compute Linear Velocity from Linear Acceleration
-  double dt = period.seconds();
-  double alpha = 0.98;  
-  lin_vel_x_ = alpha * (lin_vel_x_ + lin_acc_x_ * dt);
-  lin_vel_y_ = alpha * (lin_vel_y_ + lin_acc_y_ * dt);
-  lin_vel_z_ = alpha * (lin_vel_z_ + lin_acc_z_ * dt);
+  // // Compute Linear Velocity from Linear Acceleration
+  // double dt = period.seconds();
+  // double alpha = 0.98;  
+  // lin_vel_x_ = alpha * (lin_vel_x_ + lin_acc_x_ * dt);
+  // lin_vel_y_ = alpha * (lin_vel_y_ + lin_acc_y_ * dt);
+  // lin_vel_z_ = alpha * (lin_vel_z_ + lin_acc_z_ * dt);
   
 
   if (params_.sensor_publish_rate && (time - last_sensor_publish_time_).seconds() > 1.0 / params_.sensor_publish_rate)
@@ -171,12 +171,8 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
       odometry_message.pose.pose.orientation.z = odom_orientation_.z();
       odometry_message.pose.pose.orientation.w = odom_orientation_.w();
       
-      odometry_message.twist.twist.linear.x = lin_vel_x_;
-      odometry_message.twist.twist.linear.y = lin_vel_y_;
-      odometry_message.twist.twist.linear.z = lin_vel_z_;
+      odometry_message.twist.twist.linear.x = x_vel_;
       
-      odometry_message.twist.twist.angular.x = roll_vel_;
-      odometry_message.twist.twist.angular.y = pitch_vel_;
       odometry_message.twist.twist.angular.z = yaw_vel_;
 
       realtime_odometry_publisher_->unlockAndPublish();
