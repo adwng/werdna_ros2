@@ -18,9 +18,9 @@ class ControlNode(Node):
         super().__init__("control_node")
 
         # Subscribers
-        # self.imu_subscriber = self.create_subscription(Imu, '/imu', self.imu_callback, 10)
-        # self.odom_subscriber = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
-        # self.joint_subscriber = self.create_subscription(JointState, '/joint_state', self.joint_callback, 10)
+        self.imu_subscriber = self.create_subscription(Imu, 'werdna_odometry_broadcaster/imu', self.imu_callback, 10)
+        self.odom_subscriber = self.create_subscription(Odometry, 'werdna_odometry_broadcaster/odom', self.odom_callback, 10)
+        self.joint_subscriber = self.create_subscription(JointState, 'werdna_odometry_broadcaster/joint_state', self.joint_callback, 10)
         self.command_subscriber = self.create_subscription(JoyCtrlCmds, '/werdna_control', self.command_callback, 10)
 
         # Publishers
@@ -34,7 +34,7 @@ class ControlNode(Node):
         # self.policy_input_names = [self.policy_session.get_inputs()[0].name]
         # self.policy_output_names = [self.policy_session.get_outputs()[0].name]
 
-        self.target_joints = ["left_hip_motor_joint", "left_knee_joint", "right_hip_motor_joint", "right_knee_joint"]
+        self.target_joints = ["left_hip_motor_joint", "right_hip_motor_joint", "left_knee_joint", "right_knee_joint", "left_wheel_joint", "right_wheel_joint"]
 
         # Robot state variables
         self.height = 0
@@ -88,30 +88,60 @@ class ControlNode(Node):
         base_quat = [msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
         gravity_vector = np.array([0, 0, -1])
 
+        # Convert quaternion to Euler angles (roll, pitch, yaw)
+        roll, pitch, yaw = R.from_quat(base_quat).as_euler('xyz', degrees=True)  # Convert to degrees for better readability
+
+        # Compute projected gravity vector
         qwi = R.from_quat(base_quat).as_euler('zyx')
         inverse_rot = R.from_euler('zyx', qwi).inv().as_matrix()
-
         self.projected_gravity = np.dot(inverse_rot, gravity_vector)
+
+        # Log the IMU data
+        self.get_logger().info(f"IMU Data - Roll: {roll:.2f}, Pitch: {pitch:.2f}, Yaw: {yaw:.2f}")
 
     def odom_callback(self, msg):
         self.linear_velocity = np.array([msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z])
         self.angular_velocity = np.array([msg.twist.twist.angular.x, msg.twist.twist.angular.y, msg.twist.twist.angular.z])
 
+        # Log the odometry data
+        self.get_logger().info(
+            f"Odom - Linear Vel: x={self.linear_velocity[0]:.2f}, y={self.linear_velocity[1]:.2f}, z={self.linear_velocity[2]:.2f} | "
+            f"Angular Vel: x={self.angular_velocity[0]:.2f}, y={self.angular_velocity[1]:.2f}, z={self.angular_velocity[2]:.2f}"
+        )
+
+
     def joint_callback(self, msg):
-        for i, joint_name in enumerate(msg.name):
-            if joint_name in self.target_joints:
-                self.joint_positions[joint_name] = msg.position[i]
-                self.joint_velocities[joint_name] = msg.velocity[i]
+        ordered_joint_names = ["left_hip_motor_joint", "left_knee_joint", "left_wheel_joint", "right_hip_motor_joint", "right_knee_joint", "right_wheel_joint"]
+        
+        joint_map = {
+            "left_hip_motor_joint": "left_hip_motor_joint",
+            "right_hip_motor_joint": "right_hip_motor_joint",
+            "left_knee_joint": "left_knee_joint",
+            "right_knee_joint": "right_knee_joint",
+            "left_wheel_joint": "left_wheel_joint",
+            "right_wheel_joint": "right_wheel_joint"
+        }
+
+        # Mapping from actual joint names to indices in `msg.name`
+        joint_indices = {name: i for i, name in enumerate(msg.name)}
+
+        for target_joint in self.target_joints:
+            actual_joint = joint_map[target_joint]
+            if actual_joint in joint_indices:
+                idx = joint_indices[actual_joint]
+                self.joint_positions[target_joint] = msg.position[idx]
+                self.joint_velocities[target_joint] = msg.velocity[idx]
+
 
     def get_obs(self):
         obs = np.concatenate([
-            self.linear_velocity,  # Linear velocity (x, y)
-            self.angular_velocity,  # Angular velocity (z)
+            self.linear_velocity,  # Linear velocity (x, y, z)
+            self.angular_velocity,  # Angular velocity (x, y, z)
             self.projected_gravity,
-            np.array([self.joint_positions[j] for j in self.target_joints]),
+            np.array([self.desired_linear_x, self.desired_angular_z]),  # Desired commands
+            np.array([self.joint_positions[j] for j in self.target_joints[:4]]),
             np.array([self.joint_velocities[j] for j in self.target_joints]),
             self.previous_action,  # Previous actions
-            np.array([self.desired_linear_x, self.desired_angular_z])  # Desired commands
         ])
         return obs
 

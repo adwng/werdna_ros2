@@ -149,9 +149,11 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
 
   // Compute Linear Velocity from Linear Acceleration
   double dt = period.seconds();
-  lin_vel_x_ +=lin_acc_x_ * dt;
-  lin_vel_y_ +=lin_acc_y_ * dt;
-  lin_vel_z_ +=lin_acc_z_ * dt;
+  double alpha = 0.98;  
+  lin_vel_x_ = alpha * (lin_vel_x_ + lin_acc_x_ * dt);
+  lin_vel_y_ = alpha * (lin_vel_y_ + lin_acc_y_ * dt);
+  lin_vel_z_ = alpha * (lin_vel_z_ + lin_acc_z_ * dt);
+  
 
   if (params_.sensor_publish_rate && (time - last_sensor_publish_time_).seconds() > 1.0 / params_.sensor_publish_rate)
   {

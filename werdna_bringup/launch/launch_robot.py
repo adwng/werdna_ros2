@@ -1,7 +1,7 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
@@ -28,10 +28,15 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(ros2_control_launch_file)
     )
     
-    agent_node = Node(
-        package=agent_prefix,
-        name="werdna_agent",
-        executable="werdna_agent_node",
+    # agent_node = Node(
+    #     package=agent_prefix,
+    #     name="werdna_agent",
+    #     executable="werdna_agent_node",
+    # )
+
+    agent_node = ExecuteProcess(
+        cmd=["ros2", "run", "werdna_agent", "werdna_agent_node"],
+        output="screen",
     )
     
     return LaunchDescription([
