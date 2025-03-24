@@ -100,10 +100,9 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
 
     // Configure IMU Settings Here
     toptions.attitude_rate_hz = 100;
-
-    toptions.mounting_deg.pitch = 0;
-    toptions.mounting_deg.yaw = 90;
-    toptions.mounting_deg.roll = -90;
+    toptions.mounting_deg.roll = std::stod(info_.hardware_parameters.at("imu_mounting_deg.roll"));
+    toptions.mounting_deg.pitch = std::stod(info_.hardware_parameters.at("imu_mounting_deg.pitch"));
+    toptions.mounting_deg.yaw = std::stod(info_.hardware_parameters.at("imu_mounting_deg.yaw"));
 
     // Create the transport with the populated options
     transport = std::make_shared<Transport>(toptions);
@@ -384,21 +383,18 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
     auto a = attitude;
 
     //Processing Attitude
-    // Apply 180-degree rotation about the X-axis to flip the Z-axis
-    hw_state_imu_orientation_[0] = a.attitude.w;      // Quaternion w
-    hw_state_imu_orientation_[1] = -a.attitude.z;     // Quaternion x remains the same
-    hw_state_imu_orientation_[2] = -a.attitude.y;     // Flip y
-    hw_state_imu_orientation_[3] = a.attitude.x;      // Flip z
+    hw_state_imu_orientation_[0] = a.attitude.w;      
+    hw_state_imu_orientation_[1] = -a.attitude.z;     
+    hw_state_imu_orientation_[2] = a.attitude.y;     
+    hw_state_imu_orientation_[3] = -a.attitude.x;      
 
-    // Flip Z-axis in angular velocity
-    hw_state_imu_angular_velocity_[0] = a.rate_dps.x * DEG_TO_RAD;   // x remains the same
-    hw_state_imu_angular_velocity_[1] = -a.rate_dps.y * DEG_TO_RAD;  // Flip y
-    hw_state_imu_angular_velocity_[2] = -a.rate_dps.z * DEG_TO_RAD;  // Flip z
+    hw_state_imu_angular_velocity_[0] = a.rate_dps.x * DEG_TO_RAD;  
+    hw_state_imu_angular_velocity_[1] = a.rate_dps.y * DEG_TO_RAD;  
+    hw_state_imu_angular_velocity_[2] = a.rate_dps.z * DEG_TO_RAD;  
 
-    // Flip Z-axis in linear acceleration
-    hw_state_imu_linear_acceleration_[0] = a.accel_mps2.x;  // x remains the same
-    hw_state_imu_linear_acceleration_[1] = -a.accel_mps2.y; // Flip y
-    hw_state_imu_linear_acceleration_[2] = -a.accel_mps2.z; // Flip z
+    hw_state_imu_linear_acceleration_[0] = a.accel_mps2.x;  
+    hw_state_imu_linear_acceleration_[1] = a.accel_mps2.y;
+    hw_state_imu_linear_acceleration_[2] = a.accel_mps2.z; 
 
     // RCLCPP_INFO(
     //     rclcpp::get_logger("Pi3HatControlHardware"),
