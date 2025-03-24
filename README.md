@@ -5,13 +5,7 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 
 > [!NOTE] 
 > It is a Final Year Thesis Project and it is still not finalized.
-> 
-> Hasn't been tested on real hardware.
->
-> CAD will be published shortly.
 
-> [!IMPORTANT]
-> The Werdna Odometry Broadcaster is not tested in real life yet. Uses IMU and joints pos and handles publishing joint states, imu states, odometry, and tfs.
 
 <details>
   <summary>Dependencies</summary>

@@ -92,9 +92,14 @@ class ControlNode(Node):
         roll, pitch, yaw = R.from_quat(base_quat).as_euler('xyz', degrees=True)  # Convert to degrees for better readability
 
         # Compute projected gravity vector
-        qwi = R.from_quat(base_quat).as_euler('zyx')
-        inverse_rot = R.from_euler('zyx', qwi).inv().as_matrix()
-        self.projected_gravity = np.dot(inverse_rot, gravity_vector)
+        # qwi = R.from_quat(base_quat).as_euler('zyx')
+        # inverse_rot = R.from_euler('zyx', qwi).inv().as_matrix()
+        # self.projected_gravity = np.dot(inverse_rot, gravity_vector)
+
+        rotation_matrix = R.from_quat(base_quat).as_matrix()
+
+        # Compute the projected gravity vector by applying the inverse rotation
+        self.projected_gravity = rotation_matrix.T @ gravity_vector
 
         # Log the IMU data
         self.get_logger().info(f"IMU Data - Roll: {roll:.2f}, Pitch: {pitch:.2f}, Yaw: {yaw:.2f}")
@@ -111,26 +116,22 @@ class ControlNode(Node):
 
 
     def joint_callback(self, msg):
-        ordered_joint_names = ["left_hip_motor_joint", "left_knee_joint", "left_wheel_joint", "right_hip_motor_joint", "right_knee_joint", "right_wheel_joint"]
-        
-        joint_map = {
-            "left_hip_motor_joint": "left_hip_motor_joint",
-            "right_hip_motor_joint": "right_hip_motor_joint",
-            "left_knee_joint": "left_knee_joint",
-            "right_knee_joint": "right_knee_joint",
-            "left_wheel_joint": "left_wheel_joint",
-            "right_wheel_joint": "right_wheel_joint"
-        }
+        # Define the order in which JointState reports data
+        received_order = ["left_hip_motor_joint", "left_knee_joint", "left_wheel_joint",
+                        "right_hip_motor_joint", "right_knee_joint", "right_wheel_joint"]
 
-        # Mapping from actual joint names to indices in `msg.name`
-        joint_indices = {name: i for i, name in enumerate(msg.name)}
+        # Define the target order you want
+        target_order = ["left_hip_motor_joint", "right_hip_motor_joint",
+                        "left_knee_joint", "right_knee_joint",
+                        "left_wheel_joint", "right_wheel_joint"]
 
-        for target_joint in self.target_joints:
-            actual_joint = joint_map[target_joint]
-            if actual_joint in joint_indices:
-                idx = joint_indices[actual_joint]
-                self.joint_positions[target_joint] = msg.position[idx]
-                self.joint_velocities[target_joint] = msg.velocity[idx]
+        # Create a mapping of joint names to indices in received data
+        joint_indices = {name: i for i, name in enumerate(received_order)}
+
+        # Reorder joint positions and velocities based on the target order
+        self.joint_positions = {joint: msg.position[joint_indices[joint]] for joint in target_order}
+        self.joint_velocities = {joint: msg.velocity[joint_indices[joint]] for joint in target_order}
+
 
 
     def get_obs(self):

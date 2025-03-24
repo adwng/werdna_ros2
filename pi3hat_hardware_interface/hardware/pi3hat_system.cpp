@@ -384,16 +384,21 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
     auto a = attitude;
 
     //Processing Attitude
-    hw_state_imu_orientation_[0] = a.attitude.w;
-    hw_state_imu_orientation_[1] = -a.attitude.z;
-    hw_state_imu_orientation_[2] = a.attitude.y;
-    hw_state_imu_orientation_[3] = -a.attitude.x;
-    hw_state_imu_angular_velocity_[0] = a.rate_dps.x * DEG_TO_RAD;
-    hw_state_imu_angular_velocity_[1] = a.rate_dps.y * DEG_TO_RAD;
-    hw_state_imu_angular_velocity_[2] = a.rate_dps.z * DEG_TO_RAD;
-    hw_state_imu_linear_acceleration_[0] = a.accel_mps2.x;
-    hw_state_imu_linear_acceleration_[1] = a.accel_mps2.y;
-    hw_state_imu_linear_acceleration_[2] = a.accel_mps2.z;
+    // Apply 180-degree rotation about the X-axis to flip the Z-axis
+    hw_state_imu_orientation_[0] = a.attitude.w;      // Quaternion w
+    hw_state_imu_orientation_[1] = -a.attitude.z;     // Quaternion x remains the same
+    hw_state_imu_orientation_[2] = -a.attitude.y;     // Flip y
+    hw_state_imu_orientation_[3] = a.attitude.x;      // Flip z
+
+    // Flip Z-axis in angular velocity
+    hw_state_imu_angular_velocity_[0] = a.rate_dps.x * DEG_TO_RAD;   // x remains the same
+    hw_state_imu_angular_velocity_[1] = -a.rate_dps.y * DEG_TO_RAD;  // Flip y
+    hw_state_imu_angular_velocity_[2] = -a.rate_dps.z * DEG_TO_RAD;  // Flip z
+
+    // Flip Z-axis in linear acceleration
+    hw_state_imu_linear_acceleration_[0] = a.accel_mps2.x;  // x remains the same
+    hw_state_imu_linear_acceleration_[1] = -a.accel_mps2.y; // Flip y
+    hw_state_imu_linear_acceleration_[2] = -a.accel_mps2.z; // Flip z
 
     // RCLCPP_INFO(
     //     rclcpp::get_logger("Pi3HatControlHardware"),
