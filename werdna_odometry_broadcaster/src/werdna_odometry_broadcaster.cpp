@@ -47,7 +47,7 @@ controller_interface::InterfaceConfiguration WerdnaOdometryBroadcaster::command_
 controller_interface::InterfaceConfiguration WerdnaOdometryBroadcaster::state_interface_configuration() const
 {
   return controller_interface::InterfaceConfiguration{
-    controller_interface::interface_configuration_type::NONE
+    controller_interface::interface_configuration_type::ALL
   };
 }
 
@@ -99,7 +99,7 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
   catch (const std::out_of_range &e)
   {
     RCLCPP_INFO(get_node()->get_logger(), "failed to read joint states from hardware interface");
-    return controller_interface::return_type::OK;
+    return controller_interface::return_type::ERROR;
   }
 
     // convert orientation to Euler angles
@@ -142,10 +142,10 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
   odom_yaw_vel_ = imu_yaw_vel;
 
   // estimate z height
-  double left_leg_length = params_.leg_length * cos(left_hip_pos) + params_.leg_length * cos(left_hip_pos + left_knee_pos);
-  double right_leg_length = params_.leg_length * cos(right_hip_pos) + params_.leg_length * cos(right_hip_pos + right_knee_pos);
+  double left_leg_length = params_.leg_length * sin(left_hip_pos) + params_.leg_length * sin(left_hip_pos + left_knee_pos);
+  double right_leg_length = params_.leg_length * sin(right_hip_pos) + params_.leg_length * sin(right_hip_pos + right_knee_pos);
 
-  z_ = 0.5 * (left_leg_length + right_leg_length);
+  z_ =(0.5 * (left_leg_length + right_leg_length));
 
   // Compute Linear Velocity from Linear Acceleration
   double dt = period.seconds();

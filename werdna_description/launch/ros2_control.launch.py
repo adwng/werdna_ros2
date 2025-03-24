@@ -87,18 +87,19 @@ def generate_launch_description():
 
     delay_odometry_broadcaster_spawner_after_wheel_controller_spawner = RegisterEventHandler(
         event_handler=OnProcessExit(
-            target_action=odometry_broadcaster_spawner,
-            on_exit=[wheel_controller_spawner]
+            target_action=wheel_controller_spawner,
+            on_exit=[odometry_broadcaster_spawner]
         )
     )
 
     nodes = [
         robot_state_pub_node,
         control_node,
-        joint_state_broadcaster_spawner,
-        delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
+        # joint_state_broadcaster_spawner,
+        # delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
+        robot_controller_spawner,
         delay_wheel_controller_spawner_after_robot_controller_spawner,
-        # delay_odometry_broadcaster_spawner_after_wheel_controller_spawner
+        delay_odometry_broadcaster_spawner_after_wheel_controller_spawner
     ]
 
     return LaunchDescription(

@@ -66,7 +66,7 @@
             <param name="control_mode">position</param>
         </joint>
 
-        <!-- <joint name="right_wheel_joint">
+        <joint name="right_wheel_joint">
             <command_interface name="effort"/>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
@@ -75,7 +75,7 @@
             <param name="can_id">6</param>
             <param name="position_offset">-0.0</param>
             <param name="control_mode">effort</param>
-        </joint> -->
+        </joint>
 
     <sensor name="imu_sensor">
         <state_interface name="orientation.x"/>

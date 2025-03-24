@@ -64,12 +64,12 @@ class ControlNode(Node):
             if y == 0:
                 if x >= 0:
                     # Fully stretched along the x-axis
-                    hip_theta = 0
-                    knee_theta = 0
+                    hip_theta = 0.01
+                    knee_theta = 0.01
                 else:
                     # Fully stretched in the opposite direction along the x-axis
-                    hip_theta = 0
-                    knee_theta = 0
+                    hip_theta = 0.01
+                    knee_theta = 0.01
                 return hip_theta, knee_theta
 
             # Compute joint angles
@@ -120,19 +120,19 @@ class ControlNode(Node):
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
-        self.get_logger().info(f"Hip Angle: {hip}, Knee Angle: {knee}")
+        # self.get_logger().info(f"Hip Angle: {hip}, Knee Angle: {knee}")
 
         # wheel_cmd = Float64MultiArray()
-        # leg_cmd = Float64MultiArray()
+        leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
         # wheel_cmd.data = [action[0], action[1]]
         
         # Remaining actions control the leg joints
-        # leg_cmd.data = [hip, knee, hip, knee]
+        leg_cmd.data = [hip, knee, hip, knee]
         
         # self.wheel_controller.publish(wheel_cmd)
-        # self.legs_controller.publish(leg_cmd)
+        self.legs_controller.publish(leg_cmd)
 
     def command_callback(self, msg):
         self.height = msg.height
