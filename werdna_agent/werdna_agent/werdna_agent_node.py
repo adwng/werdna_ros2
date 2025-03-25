@@ -30,42 +30,11 @@ class ControlNode(Node):
         # Load PyTorch model
         self.model_file = "model_2000.pt"
         self.device = torch.device('cpu')  # RPi4 will use CPU
-        
-        try:
-            # Load the model according to the training code structure
-            loaded_dict = torch.load(self.model_file, map_location=self.device)
-            
-            # Check what's in the loaded dictionary
-            if isinstance(loaded_dict, dict):
-                self.get_logger().info(f"Model keys: {loaded_dict.keys()}")
-                
-                # Based on training code, we need the model_state_dict
-                if 'model_state_dict' in loaded_dict:
-                    # We need the actor_critic class. For now, we'll use the inference policy
-                    # directly if possible
-                    if 'inference_policy' in loaded_dict:
-                        self.policy = loaded_dict['inference_policy']
-                    else:
-                        # We'd need the actual actor_critic class here, but as a fallback
-                        # we'll just note that we can't load it properly
-                        self.get_logger().error("Model has model_state_dict but no inference_policy")
-                        self.policy = None
-                else:
-                    # Maybe it's the direct model
-                    self.policy = loaded_dict
-                    
-            else:
-                # Just use the model directly
-                self.policy = loaded_dict
-                
-            # Set to evaluation mode if applicable
-            if hasattr(self.policy, 'eval'):
-                self.policy.eval()
-                
-            self.get_logger().info(f"Successfully loaded PyTorch model from {self.model_file}")
-        except Exception as e:
-            self.get_logger().error(f"Failed to load PyTorch model: {e}")
-            self.policy = None
+        self.policy = None  # Placeholder for policy object
+
+        # Attempt to load the model
+        if self.load_model(self.model_file):
+            self.policy = self.get_inference_policy(self.device)
 
         self.target_joints = ["left_hip_motor_joint", "right_hip_motor_joint", "left_knee_joint", "right_knee_joint", "left_wheel_joint", "right_wheel_joint"]
 
@@ -81,6 +50,44 @@ class ControlNode(Node):
         self.joint_positions = {joint: 0.0 for joint in self.target_joints}
         self.joint_velocities = {joint: 0.0 for joint in self.target_joints}
         self.previous_action = np.zeros(2)  # 4 joints + 2 wheels
+    
+    def load_model(self, path, load_optimizer=True):
+        try:
+            loaded_dict = torch.load(path, map_location=self.device)
+            
+            # Ensure the loaded dictionary contains expected keys
+            if isinstance(loaded_dict, dict) and 'model_state_dict' in loaded_dict:
+                if hasattr(self, 'policy') and hasattr(self.policy, 'load_state_dict'):
+                    self.policy.load_state_dict(loaded_dict['model_state_dict'])
+                else:
+                    self.get_logger().error("Loaded model lacks a valid policy structure.")
+                    return False
+                
+                if load_optimizer and hasattr(self, 'optimizer'):
+                    if 'optimizer_state_dict' in loaded_dict:
+                        self.optimizer.load_state_dict(loaded_dict['optimizer_state_dict'])
+                    else:
+                        self.get_logger().warning("Optimizer state not found in checkpoint.")
+                
+                self.current_learning_iteration = loaded_dict.get('iter', 0)
+                self.get_logger().info(f"Model successfully loaded from {path}, iteration {self.current_learning_iteration}")
+                return True
+            else:
+                self.get_logger().error("Invalid model file structure. Missing 'model_state_dict'.")
+                return False
+        except Exception as e:
+            self.get_logger().error(f"Failed to load PyTorch model: {e}")
+            return False
+
+    def get_inference_policy(self, device=None):
+        if self.policy is not None:
+            self.policy.eval()  # Set to evaluation mode (important for dropout, batch norm, etc.)
+            if device is not None:
+                self.policy.to(device)
+            return self.policy.act_inference if hasattr(self.policy, 'act_inference') else None
+        self.get_logger().error("No valid policy found for inference.")
+        return None
+
     
     def inverse_kinematics(self, x=0, y=0):
         try:
