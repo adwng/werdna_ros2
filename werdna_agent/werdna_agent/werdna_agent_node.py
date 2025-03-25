@@ -32,9 +32,36 @@ class ControlNode(Node):
         self.device = torch.device('cpu')  # RPi4 will use CPU
         
         try:
-            # Load the model - special handling for RPi4
-            self.policy = torch.jit.load(self.model_file, map_location=self.device)
-            self.policy.eval()  # Set to evaluation mode
+            # Load the model according to the training code structure
+            loaded_dict = torch.load(self.model_file, map_location=self.device)
+            
+            # Check what's in the loaded dictionary
+            if isinstance(loaded_dict, dict):
+                self.get_logger().info(f"Model keys: {loaded_dict.keys()}")
+                
+                # Based on training code, we need the model_state_dict
+                if 'model_state_dict' in loaded_dict:
+                    # We need the actor_critic class. For now, we'll use the inference policy
+                    # directly if possible
+                    if 'inference_policy' in loaded_dict:
+                        self.policy = loaded_dict['inference_policy']
+                    else:
+                        # We'd need the actual actor_critic class here, but as a fallback
+                        # we'll just note that we can't load it properly
+                        self.get_logger().error("Model has model_state_dict but no inference_policy")
+                        self.policy = None
+                else:
+                    # Maybe it's the direct model
+                    self.policy = loaded_dict
+                    
+            else:
+                # Just use the model directly
+                self.policy = loaded_dict
+                
+            # Set to evaluation mode if applicable
+            if hasattr(self.policy, 'eval'):
+                self.policy.eval()
+                
             self.get_logger().info(f"Successfully loaded PyTorch model from {self.model_file}")
         except Exception as e:
             self.get_logger().error(f"Failed to load PyTorch model: {e}")
@@ -158,14 +185,40 @@ class ControlNode(Node):
         if msg.state and self.policy is not None:
             obs = self.get_obs()
             
-            # Convert numpy array to torch tensor
-            with torch.no_grad():  # Disable gradient calculations for inference
-                input_tensor = torch.FloatTensor(obs).unsqueeze(0).to(self.device)  # Add batch dimension
-                output = self.policy(input_tensor)
-                action = output.cpu().numpy().flatten()  # Convert back to numpy and remove batch dimension
-            
-            self.step(action)
-            
+            try:
+                # Convert numpy array to torch tensor
+                with torch.no_grad():  # Disable gradient calculations for inference
+                    input_tensor = torch.FloatTensor(obs).to(self.device)
+                    
+                    # Based on the training code, policy might be the act_inference method
+                    if callable(self.policy):
+                        # Try to get actions using the inference policy
+                        action = self.policy(input_tensor)
+                        
+                        # Convert to numpy if it's a tensor
+                        if isinstance(action, torch.Tensor):
+                            action = action.cpu().numpy()
+                            
+                        # If action is a tuple or dict (might contain actions, values, etc.)
+                        if isinstance(action, tuple) and len(action) > 0:
+                            action = action[0]  # First element is typically the actions
+                        elif isinstance(action, dict) and 'actions' in action:
+                            action = action['actions']
+                            
+                        # Make sure it's flattened
+                        if hasattr(action, 'flatten'):
+                            action = action.flatten()
+                        
+                        self.get_logger().info(f"Model inference successful. Action shape: {action.shape}")
+                    else:
+                        self.get_logger().error("Policy is not callable")
+                        action = np.array([0, 0])  # Default safe action
+                
+                self.step(action)
+            except Exception as e:
+                self.get_logger().error(f"Error running inference: {e}")
+                # Fall back to a safe action
+                self.step(np.array([0, 0]))
 
 def main(args=None):
     rclpy.init(args=args)
