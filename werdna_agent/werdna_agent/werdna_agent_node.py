@@ -7,7 +7,7 @@ from nav_msgs.msg import Odometry
 from werdna_msgs.msg import JoyCtrlCmds
 
 # import onnx
-# import onnxruntime as ort
+import onnxruntime as ort
 from scipy.spatial.transform import Rotation as R
 
 import os
@@ -30,9 +30,9 @@ class ControlNode(Node):
         self.model_file = "policy_no_lin_vel.onnx"
         
         # Load ONNX model
-        self.policy_session = ort.InferenceSession(self.model_file)
-        self.policy_input_names = [self.policy_session.get_inputs()[0].name]
-        self.policy_output_names = [self.policy_session.get_outputs()[0].name]
+        # self.policy_session = ort.InferenceSession(self.model_file)
+        # self.policy_input_names = [self.policy_session.get_inputs()[0].name]
+        # self.policy_output_names = [self.policy_session.get_outputs()[0].name]
 
         self.target_joints = ["left_hip_motor_joint", "right_hip_motor_joint", "left_knee_joint", "right_knee_joint", "left_wheel_joint", "right_wheel_joint"]
 
@@ -144,11 +144,12 @@ class ControlNode(Node):
         return obs
 
     def step(self, action):
-        # self.previous_action = action
+        exec_actions = np.clip(action, -2, 2)
+        self.previous_action = exec_actions
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
-        self.get_logger().info(f"Actions (1): {action[0]}, Actions (2): {action[1]}}")
+        self.get_logger().info(f"Actions (1): {exec_actions[0]}, Actions (2): {exec_actions[1]}")
 
         # wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
@@ -168,8 +169,9 @@ class ControlNode(Node):
         self.desired_angular_z = msg.angular.z 
 
         if msg.state:
+            action =0
             obs = self.get_obs()
-            action = self.policy_session.run(self.policy_output_names, {self.policy_input_names[0]: obs.reshape(1, -1)})[0].flatten()
+            # action = self.policy_session.run(self.policy_output_names, {self.policy_input_names[0]: obs.reshape(1, -1)})[0].flatten()
             self.step(action)
             
 
