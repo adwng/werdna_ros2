@@ -4,9 +4,9 @@
     <ros2_control name="werdna_ros2_control" type="system">
         <hardware>
             <plugin>pi3hat_hardware_interface/Pi3HatControlHardware</plugin>
-            <param name="imu_mounting_deg.roll">-90</param>
+            <param name="imu_mounting_deg.roll">90</param>
             <param name="imu_mounting_deg.pitch">0</param>
-            <param name="imu_mounting_deg.yaw">90</param>
+            <param name="imu_mounting_deg.yaw">-90</param>
         </hardware>
 
         <joint name="left_hip_motor_joint">

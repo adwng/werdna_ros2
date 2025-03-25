@@ -42,5 +42,5 @@ def generate_launch_description():
     return LaunchDescription([
         teleop,
         ros2_control,
-        # agent_node,
+        agent_node,
     ])

@@ -18,21 +18,21 @@ class ControlNode(Node):
         super().__init__("control_node")
 
         # Subscribers
-        self.imu_subscriber = self.create_subscription(Imu, 'werdna_odometry_broadcaster/imu', self.imu_callback, 10)
-        self.odom_subscriber = self.create_subscription(Odometry, 'werdna_odometry_broadcaster/odom', self.odom_callback, 10)
-        self.joint_subscriber = self.create_subscription(JointState, 'werdna_odometry_broadcaster/joint_state', self.joint_callback, 10)
+        self.imu_subscriber = self.create_subscription(Imu, 'odometry_broadcaster/imu', self.imu_callback, 10)
+        # self.odom_subscriber = self.create_subscription(Odometry, 'odometry_broadcaster/odom', self.odom_callback, 10)
+        self.joint_subscriber = self.create_subscription(JointState, '/joint_states', self.joint_callback, 10)
         self.command_subscriber = self.create_subscription(JoyCtrlCmds, '/werdna_control', self.command_callback, 10)
 
         # Publishers
         # self.wheel_controller = self.create_publisher(Float64MultiArray, '/wheel_controller/commands', 10)
         self.legs_controller = self.create_publisher(Float64MultiArray, "/position_controller/commands", 10)
 
-        # self.model_file = "home/andrew/policy.onnx"
+        self.model_file = "policy_no_lin_vel.onnx"
         
         # Load ONNX model
-        # self.policy_session = ort.InferenceSession(self.model_file)
-        # self.policy_input_names = [self.policy_session.get_inputs()[0].name]
-        # self.policy_output_names = [self.policy_session.get_outputs()[0].name]
+        self.policy_session = ort.InferenceSession(self.model_file)
+        self.policy_input_names = [self.policy_session.get_inputs()[0].name]
+        self.policy_output_names = [self.policy_session.get_outputs()[0].name]
 
         self.target_joints = ["left_hip_motor_joint", "right_hip_motor_joint", "left_knee_joint", "right_knee_joint", "left_wheel_joint", "right_wheel_joint"]
 
@@ -43,7 +43,6 @@ class ControlNode(Node):
         self.desired_linear_x = 0
         self.desired_angular_z = 0
 
-        self.linear_velocity = np.array([0.0, 0.0, 0.0])
         self.angular_velocity = np.array([0.0, 0.0, 0.0])
         self.projected_gravity = np.array([0.0, 0.0, 0.0])
         self.joint_positions = {joint: 0.0 for joint in self.target_joints}
@@ -89,12 +88,9 @@ class ControlNode(Node):
         gravity_vector = np.array([0, 0, -1])
 
         # Convert quaternion to Euler angles (roll, pitch, yaw)
-        roll, pitch, yaw = R.from_quat(base_quat).as_euler('xyz', degrees=True)  # Convert to degrees for better readability
+        # roll, pitch, yaw = R.from_quat(base_quat).as_euler('xyz', degrees=True)  # Convert to degrees for better readability
 
-        # Compute projected gravity vector
-        # qwi = R.from_quat(base_quat).as_euler('zyx')
-        # inverse_rot = R.from_euler('zyx', qwi).inv().as_matrix()
-        # self.projected_gravity = np.dot(inverse_rot, gravity_vector)
+        self.angular_velocity = np.array([msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z])
 
         rotation_matrix = R.from_quat(base_quat).as_matrix()
 
@@ -102,17 +98,18 @@ class ControlNode(Node):
         self.projected_gravity = rotation_matrix.T @ gravity_vector
 
         # Log the IMU data
-        self.get_logger().info(f"IMU Data - Roll: {roll:.2f}, Pitch: {pitch:.2f}, Yaw: {yaw:.2f}")
+        # self.get_logger().info(f"IMU Data - Roll: {roll:.2f}, Pitch: {pitch:.2f}, Yaw: {yaw:.2f}")
+        # self.get_logger().info(f"Projected Gravity: {self.projected_gravity}")
 
     def odom_callback(self, msg):
         self.linear_velocity = np.array([msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z])
         self.angular_velocity = np.array([msg.twist.twist.angular.x, msg.twist.twist.angular.y, msg.twist.twist.angular.z])
 
         # Log the odometry data
-        self.get_logger().info(
-            f"Odom - Linear Vel: x={self.linear_velocity[0]:.2f}, y={self.linear_velocity[1]:.2f}, z={self.linear_velocity[2]:.2f} | "
-            f"Angular Vel: x={self.angular_velocity[0]:.2f}, y={self.angular_velocity[1]:.2f}, z={self.angular_velocity[2]:.2f}"
-        )
+        # self.get_logger().info(
+        #     f"Odom - Linear Vel: x={self.linear_velocity[0]:.2f}, y={self.linear_velocity[1]:.2f}, z={self.linear_velocity[2]:.2f} | "
+        #     f"Angular Vel: x={self.angular_velocity[0]:.2f}, y={self.angular_velocity[1]:.2f}, z={self.angular_velocity[2]:.2f}"
+        # )
 
 
     def joint_callback(self, msg):
@@ -129,14 +126,14 @@ class ControlNode(Node):
         joint_indices = {name: i for i, name in enumerate(received_order)}
 
         # Reorder joint positions and velocities based on the target order
-        self.joint_positions = {joint: msg.position[joint_indices[joint]] for joint in target_order}
-        self.joint_velocities = {joint: msg.velocity[joint_indices[joint]] for joint in target_order}
+        self.joint_positions = {msg.position[joint_indices[joint]] for joint in target_order}
+        self.joint_velocities = {msg.velocity[joint_indices[joint]] for joint in target_order}
 
+        # print(self.joint_positions)
 
 
     def get_obs(self):
         obs = np.concatenate([
-            self.linear_velocity,  # Linear velocity (x, y, z)
             self.angular_velocity,  # Angular velocity (x, y, z)
             self.projected_gravity,
             np.array([self.desired_linear_x, self.desired_angular_z]),  # Desired commands
@@ -151,7 +148,7 @@ class ControlNode(Node):
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
-        # self.get_logger().info(f"Hip Angle: {hip}, Knee Angle: {knee}")
+        self.get_logger().info(f"Actions (1): {action[0]}, Actions (2): {action[1]}}")
 
         # wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
@@ -171,9 +168,8 @@ class ControlNode(Node):
         self.desired_angular_z = msg.angular.z 
 
         if msg.state:
-            # obs = self.get_obs()
-            # action = self.policy_session.run(self.policy_output_names, {self.policy_input_names[0]: obs.reshape(1, -1)})[0].flatten()
-            action  = 0
+            obs = self.get_obs()
+            action = self.policy_session.run(self.policy_output_names, {self.policy_input_names[0]: obs.reshape(1, -1)})[0].flatten()
             self.step(action)
             
 
