@@ -56,38 +56,39 @@ class ControlNode(Node):
             loaded_dict = torch.load(path, map_location=self.device)
             
             # Ensure the loaded dictionary contains expected keys
-            if isinstance(loaded_dict, dict) and 'model_state_dict' in loaded_dict:
-                if hasattr(self, 'policy') and hasattr(self.policy, 'load_state_dict'):
-                    self.policy.load_state_dict(loaded_dict['model_state_dict'])
-                else:
-                    self.get_logger().error("Loaded model lacks a valid policy structure.")
-                    return False
+            # if isinstance(loaded_dict, dict) and 'model_state_dict' in loaded_dict:
+            #     if hasattr(self, 'policy') and hasattr(self.policy, 'load_state_dict'):
+            #         self.policy.load_state_dict(loaded_dict['model_state_dict'])
+            #     else:
+            #         self.get_logger().error("Loaded model lacks a valid policy structure.")
+            #         return False
                 
-                if load_optimizer and hasattr(self, 'optimizer'):
-                    if 'optimizer_state_dict' in loaded_dict:
-                        self.optimizer.load_state_dict(loaded_dict['optimizer_state_dict'])
-                    else:
-                        self.get_logger().warning("Optimizer state not found in checkpoint.")
+            #     if load_optimizer and hasattr(self, 'optimizer'):
+            #         if 'optimizer_state_dict' in loaded_dict:
+            #             self.optimizer.load_state_dict(loaded_dict['optimizer_state_dict'])
+            #         else:
+            #             self.get_logger().warning("Optimizer state not found in checkpoint.")
                 
-                self.current_learning_iteration = loaded_dict.get('iter', 0)
-                self.get_logger().info(f"Model successfully loaded from {path}, iteration {self.current_learning_iteration}")
-                return True
-            else:
-                self.get_logger().error("Invalid model file structure. Missing 'model_state_dict'.")
-                return False
+            #     self.current_learning_iteration = loaded_dict.get('iter', 0)
+            #     self.get_logger().info(f"Model successfully loaded from {path}, iteration {self.current_learning_iteration}")
+            #     return True
+            # else:
+            #     self.get_logger().error("Invalid model file structure. Missing 'model_state_dict'.")
+            #     return False
+
+            self.policy.load_state_dict(loaded_dict["model_state_dict"])
+            if load_optimizer:
+                self.policy.load_state_dict(loaded_dict['optimizer_state_dict'])
+            self.current_learning_iteration = loaded_dict['iter']
         except Exception as e:
             self.get_logger().error(f"Failed to load PyTorch model: {e}")
             return False
 
     def get_inference_policy(self, device=None):
-        if self.policy is not None:
-            self.policy.eval()  # Set to evaluation mode (important for dropout, batch norm, etc.)
-            if device is not None:
-                self.policy.to(device)
-            return self.policy.act_inference if hasattr(self.policy, 'act_inference') else None
-        self.get_logger().error("No valid policy found for inference.")
-        return None
-
+        self.policy.eval()  # Set to evaluation mode (important for dropout, batch norm, etc.)
+        if device is not None:
+            self.policy.to(device)
+        return self.policy.act_inference 
     
     def inverse_kinematics(self, x=0, y=0):
         try:
@@ -189,7 +190,7 @@ class ControlNode(Node):
         self.desired_linear_x = msg.linear.x
         self.desired_angular_z = msg.angular.z 
 
-        if msg.state and self.policy is not None:
+        if msg.state:
             obs = self.get_obs()
             
             try:
