@@ -28,13 +28,11 @@ class ControlNode(Node):
         self.legs_controller = self.create_publisher(Float64MultiArray, "/position_controller/commands", 10)
 
         # Load PyTorch model
-        self.model_file = "model_2000.pt"
-        self.device = torch.device('cpu')  # RPi4 will use CPU
-        self.policy = None  # Placeholder for policy object
-
-        # Attempt to load the model
-        if self.load_model(self.model_file):
-            self.policy = self.get_inference_policy(self.device)
+        self.model_file = "policy_1.pt"
+        
+        # Load TorchScript Model
+        self.policy_model = torch.jit.load(self.model_file, map_location="cpu")
+        self.policy_model.eval()
 
         self.target_joints = ["left_hip_motor_joint", "right_hip_motor_joint", "left_knee_joint", "right_knee_joint", "left_wheel_joint", "right_wheel_joint"]
 
@@ -51,44 +49,6 @@ class ControlNode(Node):
         self.joint_velocities = {joint: 0.0 for joint in self.target_joints}
         self.previous_action = np.zeros(2)  # 4 joints + 2 wheels
     
-    def load_model(self, path, load_optimizer=True):
-        try:
-            loaded_dict = torch.load(path, map_location=self.device)
-            
-            # Ensure the loaded dictionary contains expected keys
-            # if isinstance(loaded_dict, dict) and 'model_state_dict' in loaded_dict:
-            #     if hasattr(self, 'policy') and hasattr(self.policy, 'load_state_dict'):
-            #         self.policy.load_state_dict(loaded_dict['model_state_dict'])
-            #     else:
-            #         self.get_logger().error("Loaded model lacks a valid policy structure.")
-            #         return False
-                
-            #     if load_optimizer and hasattr(self, 'optimizer'):
-            #         if 'optimizer_state_dict' in loaded_dict:
-            #             self.optimizer.load_state_dict(loaded_dict['optimizer_state_dict'])
-            #         else:
-            #             self.get_logger().warning("Optimizer state not found in checkpoint.")
-                
-            #     self.current_learning_iteration = loaded_dict.get('iter', 0)
-            #     self.get_logger().info(f"Model successfully loaded from {path}, iteration {self.current_learning_iteration}")
-            #     return True
-            # else:
-            #     self.get_logger().error("Invalid model file structure. Missing 'model_state_dict'.")
-            #     return False
-
-            self.policy.load_state_dict(loaded_dict["model_state_dict"])
-            if load_optimizer:
-                self.policy.load_state_dict(loaded_dict['optimizer_state_dict'])
-            self.current_learning_iteration = loaded_dict['iter']
-        except Exception as e:
-            self.get_logger().error(f"Failed to load PyTorch model: {e}")
-            return False
-
-    def get_inference_policy(self, device=None):
-        self.policy.eval()  # Set to evaluation mode (important for dropout, batch norm, etc.)
-        if device is not None:
-            self.policy.to(device)
-        return self.policy.act_inference 
     
     def inverse_kinematics(self, x=0, y=0):
         try:
@@ -171,7 +131,7 @@ class ControlNode(Node):
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
-        self.get_logger().info(f"Actions (1): {exec_actions[0]}, Actions (2): {exec_actions[1]}")
+        self.get_logger().info(f"Actions (0): {exec_actions[0]}, Actions (1): {exec_actions[1]}")
 
         # wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
@@ -191,42 +151,12 @@ class ControlNode(Node):
         self.desired_angular_z = msg.angular.z 
 
         if msg.state:
+            # action = None
             obs = self.get_obs()
-            
-            try:
-                # Convert numpy array to torch tensor
-                with torch.no_grad():  # Disable gradient calculations for inference
-                    input_tensor = torch.FloatTensor(obs).to(self.device)
-                    
-                    # Based on the training code, policy might be the act_inference method
-                    if callable(self.policy):
-                        # Try to get actions using the inference policy
-                        action = self.policy(input_tensor)
-                        
-                        # Convert to numpy if it's a tensor
-                        if isinstance(action, torch.Tensor):
-                            action = action.cpu().numpy()
-                            
-                        # If action is a tuple or dict (might contain actions, values, etc.)
-                        if isinstance(action, tuple) and len(action) > 0:
-                            action = action[0]  # First element is typically the actions
-                        elif isinstance(action, dict) and 'actions' in action:
-                            action = action['actions']
-                            
-                        # Make sure it's flattened
-                        if hasattr(action, 'flatten'):
-                            action = action.flatten()
-                        
-                        self.get_logger().info(f"Model inference successful. Action shape: {action.shape}")
-                    else:
-                        self.get_logger().error("Policy is not callable")
-                        action = np.array([0, 0])  # Default safe action
-                
-                self.step(action)
-            except Exception as e:
-                self.get_logger().error(f"Error running inference: {e}")
-                # Fall back to a safe action
-                self.step(np.array([0, 0]))
+            obs_tensor = torch.tensor(obs).unsqueeze()
+            with torch.no_grad():
+                action = self.policy_model(obs_tensor).numpy().flatten()
+            self.step(action)
 
 def main(args=None):
     rclpy.init(args=args)
