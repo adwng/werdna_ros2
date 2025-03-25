@@ -6,8 +6,8 @@ from sensor_msgs.msg import Imu, JointState
 from nav_msgs.msg import Odometry
 from werdna_msgs.msg import JoyCtrlCmds
 
-# import onnx
-import onnxruntime as ort
+# Import torch for model inference
+import torch
 from scipy.spatial.transform import Rotation as R
 
 import os
@@ -27,12 +27,18 @@ class ControlNode(Node):
         # self.wheel_controller = self.create_publisher(Float64MultiArray, '/wheel_controller/commands', 10)
         self.legs_controller = self.create_publisher(Float64MultiArray, "/position_controller/commands", 10)
 
-        self.model_file = "policy_no_lin_vel.onnx"
+        # Load PyTorch model
+        self.model_file = "model_2000.pt"
+        self.device = torch.device('cpu')  # RPi4 will use CPU
         
-        # Load ONNX model
-        # self.policy_session = ort.InferenceSession(self.model_file)
-        # self.policy_input_names = [self.policy_session.get_inputs()[0].name]
-        # self.policy_output_names = [self.policy_session.get_outputs()[0].name]
+        try:
+            # Load the model - special handling for RPi4
+            self.policy = torch.jit.load(self.model_file, map_location=self.device)
+            self.policy.eval()  # Set to evaluation mode
+            self.get_logger().info(f"Successfully loaded PyTorch model from {self.model_file}")
+        except Exception as e:
+            self.get_logger().error(f"Failed to load PyTorch model: {e}")
+            self.policy = None
 
         self.target_joints = ["left_hip_motor_joint", "right_hip_motor_joint", "left_knee_joint", "right_knee_joint", "left_wheel_joint", "right_wheel_joint"]
 
@@ -80,15 +86,12 @@ class ControlNode(Node):
 
             return hip_theta, knee_theta
         except Exception as e:
-            print(f"Error in inverse_kinematics with x={x}, y={y}: {e}")
+            self.get_logger().error(f"Error in inverse_kinematics with x={x}, y={y}: {e}")
             return 0, 0
     
     def imu_callback(self, msg):
         base_quat = [msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
         gravity_vector = np.array([0, 0, -1])
-
-        # Convert quaternion to Euler angles (roll, pitch, yaw)
-        # roll, pitch, yaw = R.from_quat(base_quat).as_euler('xyz', degrees=True)  # Convert to degrees for better readability
 
         self.angular_velocity = np.array([msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z])
 
@@ -97,40 +100,24 @@ class ControlNode(Node):
         # Compute the projected gravity vector by applying the inverse rotation
         self.projected_gravity = rotation_matrix.T @ gravity_vector
 
-        # Log the IMU data
-        # self.get_logger().info(f"IMU Data - Roll: {roll:.2f}, Pitch: {pitch:.2f}, Yaw: {yaw:.2f}")
-        # self.get_logger().info(f"Projected Gravity: {self.projected_gravity}")
-
     def odom_callback(self, msg):
         self.linear_velocity = np.array([msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z])
         self.angular_velocity = np.array([msg.twist.twist.angular.x, msg.twist.twist.angular.y, msg.twist.twist.angular.z])
 
-        # Log the odometry data
-        # self.get_logger().info(
-        #     f"Odom - Linear Vel: x={self.linear_velocity[0]:.2f}, y={self.linear_velocity[1]:.2f}, z={self.linear_velocity[2]:.2f} | "
-        #     f"Angular Vel: x={self.angular_velocity[0]:.2f}, y={self.angular_velocity[1]:.2f}, z={self.angular_velocity[2]:.2f}"
-        # )
-
-
     def joint_callback(self, msg):
-        # Define the order in which JointState reports data
-        received_order = ["left_hip_motor_joint", "left_knee_joint", "left_wheel_joint",
-                        "right_hip_motor_joint", "right_knee_joint", "right_wheel_joint"]
-
-        # Define the target order you want
-        target_order = ["left_hip_motor_joint", "right_hip_motor_joint",
-                        "left_knee_joint", "right_knee_joint",
-                        "left_wheel_joint", "right_wheel_joint"]
-
-        # Create a mapping of joint names to indices in received data
-        joint_indices = {name: i for i, name in enumerate(received_order)}
-
-        # Reorder joint positions and velocities based on the target order
-        self.joint_positions = {msg.position[joint_indices[joint]] for joint in target_order}
-        self.joint_velocities = {msg.velocity[joint_indices[joint]] for joint in target_order}
-
-        # print(self.joint_positions)
-
+        # The order in which joint_states comes in
+        received_order = ["left_hip_motor_joint", "left_knee_joint", "left_wheel_joint", 
+                          "right_hip_motor_joint", "right_knee_joint", "right_wheel_joint"]
+        
+        # Extract positions and velocities in the received order
+        positions = {joint: msg.position[i] for i, joint in enumerate(received_order) if i < len(msg.position)}
+        velocities = {joint: msg.velocity[i] for i, joint in enumerate(received_order) if i < len(msg.velocity)}
+        
+        # Now save them in our target order
+        for joint in self.target_joints:
+            if joint in positions:
+                self.joint_positions[joint] = positions[joint]
+                self.joint_velocities[joint] = velocities[joint]
 
     def get_obs(self):
         obs = np.concatenate([
@@ -168,10 +155,15 @@ class ControlNode(Node):
         self.desired_linear_x = msg.linear.x
         self.desired_angular_z = msg.angular.z 
 
-        if msg.state:
-            action =0
+        if msg.state and self.policy is not None:
             obs = self.get_obs()
-            # action = self.policy_session.run(self.policy_output_names, {self.policy_input_names[0]: obs.reshape(1, -1)})[0].flatten()
+            
+            # Convert numpy array to torch tensor
+            with torch.no_grad():  # Disable gradient calculations for inference
+                input_tensor = torch.FloatTensor(obs).unsqueeze(0).to(self.device)  # Add batch dimension
+                output = self.policy(input_tensor)
+                action = output.cpu().numpy().flatten()  # Convert back to numpy and remove batch dimension
+            
             self.step(action)
             
 
