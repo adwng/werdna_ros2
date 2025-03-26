@@ -186,7 +186,7 @@ class ControlNode(Node):
             # Send the robot to a safe position with wheels stopped
             hip, knee = self.inverse_kinematics(0, max(0.1, self.height))  # Ensure some minimum height for stability
             leg_cmd = Float64MultiArray()
-            leg_cmd.data = [hip, knee, hip, knee]
+            leg_cmd.data = [float(hip), float(knee), float(hip), float(knee)]
             self.legs_controller.publish(leg_cmd)
             
             # Update previous action to zeros
@@ -205,12 +205,12 @@ class ControlNode(Node):
         leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        wheel_cmd.data = [exec_actions[0], exec_actions[1]]
+        wheel_cmd.data = [float(exec_actions[0]), float(exec_actions[1])]
         
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, knee, hip, knee]
         
-        # self.wheel_controller.publish(wheel_cmd)
+        self.wheel_controller.publish(wheel_cmd)
         self.legs_controller.publish(leg_cmd)
 
     def command_callback(self, msg):
