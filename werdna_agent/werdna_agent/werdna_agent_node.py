@@ -29,7 +29,7 @@ class ControlNode(Node):
 
         # Publishers
         self.get_logger().info("Setting up publishers...")
-        # self.wheel_controller = self.create_publisher(Float64MultiArray, '/wheel_controller/commands', 10)
+        self.wheel_controller = self.create_publisher(Float64MultiArray, '/wheel_controller/commands', 10)
         self.legs_controller = self.create_publisher(Float64MultiArray, "/position_controller/commands", 10)
         self.get_logger().info("Publishers initialized")
 
