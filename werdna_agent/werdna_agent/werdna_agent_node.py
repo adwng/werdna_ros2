@@ -184,10 +184,13 @@ class ControlNode(Node):
         if self.safety_triggered:
             self.get_logger().warn("Safety stop active: Robot pitch exceeds threshold. Sending zero action.")
             # Send the robot to a safe position with wheels stopped
-            hip, knee = self.inverse_kinematics(0, max(0.1, self.height))  # Ensure some minimum height for stability
+            hip, knee = self.inverse_kinematics(0.0,0.01)  # Ensure some minimum height for stability
             leg_cmd = Float64MultiArray()
             leg_cmd.data = [float(hip), float(knee), float(hip), float(knee)]
             self.legs_controller.publish(leg_cmd)
+            wheel_cmd = Float64MultiArray()
+            wheel_cmd.data = [0.0, 0.0]
+            self.wheel_controller.publish(leg_cmd)
             
             # Update previous action to zeros
             self.previous_action = np.zeros(2)
@@ -205,7 +208,7 @@ class ControlNode(Node):
         leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        wheel_cmd.data = [float(exec_actions[0]), float(exec_actions[1])]
+        wheel_cmd.data = [float(exec_actions[0] * -1.0), float(exec_actions[1] * -1.0)]
         
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, knee, hip, knee]
