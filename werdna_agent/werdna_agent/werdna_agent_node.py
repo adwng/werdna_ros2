@@ -11,30 +11,46 @@ import torch
 from scipy.spatial.transform import Rotation as R
 
 import os
+import time
 
 class ControlNode(Node):
 
     def __init__(self):
         super().__init__("control_node")
+        
+        self.get_logger().info("Initializing Werdna Control Node...")
 
         # Subscribers
+        self.get_logger().info("Setting up subscribers...")
         self.imu_subscriber = self.create_subscription(Imu, 'odometry_broadcaster/imu', self.imu_callback, 10)
-        # self.odom_subscriber = self.create_subscription(Odometry, 'odometry_broadcaster/odom', self.odom_callback, 10)
         self.joint_subscriber = self.create_subscription(JointState, '/joint_states', self.joint_callback, 10)
         self.command_subscriber = self.create_subscription(JoyCtrlCmds, '/werdna_control', self.command_callback, 10)
+        self.get_logger().info("Subscribers initialized")
 
         # Publishers
+        self.get_logger().info("Setting up publishers...")
         # self.wheel_controller = self.create_publisher(Float64MultiArray, '/wheel_controller/commands', 10)
         self.legs_controller = self.create_publisher(Float64MultiArray, "/position_controller/commands", 10)
+        self.get_logger().info("Publishers initialized")
 
         # Load PyTorch model
         self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/policy_1.pt"
+        self.get_logger().info(f"Loading TorchScript model from: {self.model_file}")
         
-        # Load TorchScript Model
-        self.policy_model = torch.jit.load(self.model_file, map_location="cpu")
-        self.policy_model.eval()
+        try:
+            # Load TorchScript Model
+            start_time = time.time()
+            self.policy_model = torch.jit.load(self.model_file, map_location="cpu")
+            self.policy_model.eval()
+            load_time = time.time() - start_time
+            self.get_logger().info(f"Model successfully loaded in {load_time:.2f} seconds!")
+            
+        except Exception as e:
+            self.get_logger().error(f"Failed to load model: {e}")
+            self.policy_model = None
 
         self.target_joints = ["left_hip_motor_joint", "right_hip_motor_joint", "left_knee_joint", "right_knee_joint", "left_wheel_joint", "right_wheel_joint"]
+        self.get_logger().info(f"Target joints configured: {self.target_joints}")
 
         # Robot state variables
         self.height = 0
@@ -48,7 +64,17 @@ class ControlNode(Node):
         self.joint_positions = {joint: 0.0 for joint in self.target_joints}
         self.joint_velocities = {joint: 0.0 for joint in self.target_joints}
         self.previous_action = np.zeros(2)  # 4 joints + 2 wheels
-    
+        
+        # Safety parameters
+        self.pitch = 0.0
+
+        self.pitch_threshold = 0.4  # ~23 degrees in radians - adjust based on your robot's stability
+        self.safety_triggered = False
+        
+        self.get_logger().info("Safety parameters configured:")
+        self.get_logger().info(f"  - Pitch threshold: {self.pitch_threshold:.2f} radians ({np.degrees(self.pitch_threshold):.1f} degrees)")
+        
+        self.get_logger().info("Werdna Control Node initialization complete!")
     
     def inverse_kinematics(self, x=0, y=0):
         try:
@@ -94,10 +120,28 @@ class ControlNode(Node):
 
         # Compute the projected gravity vector by applying the inverse rotation
         self.projected_gravity = rotation_matrix.T @ gravity_vector
-
-    def odom_callback(self, msg):
-        self.linear_velocity = np.array([msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z])
-        self.angular_velocity = np.array([msg.twist.twist.angular.x, msg.twist.twist.angular.y, msg.twist.twist.angular.z])
+        
+        # Extract roll and pitch from quaternion for safety checks
+        euler_angles = R.from_quat(base_quat).as_euler('xyz')
+        self.roll = euler_angles[0]
+        self.pitch = euler_angles[1]
+        
+        # Log roll and pitch occasionally (every ~1 second to avoid flooding logs)
+        if hasattr(self, 'last_imu_log_time') and time.time() - self.last_imu_log_time < 1.0:
+            pass  # Skip logging if less than 1 second has passed
+        else:
+            self.last_imu_log_time = time.time()
+            roll_deg = np.degrees(self.roll)
+            pitch_deg = np.degrees(self.pitch)
+            self.get_logger().debug(f"IMU orientation - Roll: {roll_deg:.1f}°, Pitch: {pitch_deg:.1f}°")
+        
+        # Check if pitch exceeds threshold and log
+        if abs(self.pitch) > self.pitch_threshold and not self.safety_triggered:
+            self.safety_triggered = True
+            self.get_logger().warn(f"SAFETY ALERT: Pitch angle ({np.degrees(self.pitch):.1f}°) exceeds threshold ({np.degrees(self.pitch_threshold):.1f}°). Stopping robot!")
+        elif abs(self.pitch) <= self.pitch_threshold and self.safety_triggered:
+            self.safety_triggered = False
+            self.get_logger().info(f"Robot back within safe pitch range ({np.degrees(self.pitch):.1f}°). Movement enabled.")
 
     def joint_callback(self, msg):
         # The order in which joint_states comes in
@@ -113,6 +157,16 @@ class ControlNode(Node):
             if joint in positions:
                 self.joint_positions[joint] = positions[joint]
                 self.joint_velocities[joint] = velocities[joint]
+        
+        # Occasionally log joint positions (every ~5 seconds)
+        # if hasattr(self, 'last_joint_log_time') and time.time() - self.last_joint_log_time < 5.0:
+        #     pass  # Skip logging if less than 5 seconds has passed
+        # else:
+        #     self.last_joint_log_time = time.time()
+        #     hip_pos = self.joint_positions['left_hip_motor_joint']
+        #     knee_pos = self.joint_positions['left_knee_joint']
+        #     wheel_vel = self.joint_velocities['left_wheel_joint']
+        #     self.get_logger().debug(f"Joint state - Hip: {hip_pos:.2f} rad, Knee: {knee_pos:.2f} rad, Wheel vel: {wheel_vel:.2f} rad/s")
 
     def get_obs(self):
         obs = np.concatenate([
@@ -126,18 +180,32 @@ class ControlNode(Node):
         return obs
 
     def step(self, action):
+        # Check if safety stop is triggered due to excessive pitch
+        if self.safety_triggered:
+            self.get_logger().warn("Safety stop active: Robot pitch exceeds threshold. Sending zero action.")
+            # Send the robot to a safe position with wheels stopped
+            hip, knee = self.inverse_kinematics(0, max(0.1, self.height))  # Ensure some minimum height for stability
+            leg_cmd = Float64MultiArray()
+            leg_cmd.data = [hip, knee, hip, knee]
+            self.legs_controller.publish(leg_cmd)
+            
+            # Update previous action to zeros
+            self.previous_action = np.zeros(2)
+            return
+        
+        # Normal operation if safety is not triggered
         exec_actions = np.clip(action, -0.2, 0.2)
         self.previous_action = exec_actions
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
-        self.get_logger().info(f"Actions (0): {exec_actions[0]}, Actions (1): {exec_actions[1]}")
+        # self.get_logger().info(f"Actions (0): {exec_actions[0]:.3f}, Actions (1): {exec_actions[1]:.3f}, Height: {self.height:.3f}")
 
-        # wheel_cmd = Float64MultiArray()
+        wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        # wheel_cmd.data = [action[0], action[1]]
+        wheel_cmd.data = [exec_actions[0], exec_actions[1]]
         
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, knee, hip, knee]
@@ -146,16 +214,48 @@ class ControlNode(Node):
         self.legs_controller.publish(leg_cmd)
 
     def command_callback(self, msg):
+        # Store previous values for change detection
+        prev_height = self.height
+        prev_linear_x = self.desired_linear_x
+        prev_angular_z = self.desired_angular_z
+        prev_state = hasattr(self, 'prev_state') and self.prev_state
+        
+        # Update current values
         self.height = msg.height
         self.desired_linear_x = msg.linear.x
-        self.desired_angular_z = msg.angular.z 
-
+        self.desired_angular_z = msg.angular.z
+        self.prev_state = msg.state
+        
+        # Log commands when they change
+        if (prev_height != self.height or 
+            prev_linear_x != self.desired_linear_x or 
+            prev_angular_z != self.desired_angular_z or
+            prev_state != msg.state):
+            
+            self.get_logger().info(f"Received command - Height: {self.height:.2f}, Linear X: {self.desired_linear_x:.2f}, Angular Z: {self.desired_angular_z:.2f}, State: {msg.state}")
+        
         if msg.state:
+            if self.policy_model is None:
+                self.get_logger().error("Cannot execute command: Model not loaded correctly")
+                return
+                
             # action = None
             obs = self.get_obs()
             obs_tensor = torch.tensor(obs).unsqueeze(0)
+            
+            # Measure inference time
+            start_time = time.time()
             with torch.no_grad():
                 action = self.policy_model(obs_tensor).numpy().flatten()
+            inference_time = time.time() - start_time
+            
+            # Log inference time occasionally
+            if hasattr(self, 'last_inference_log_time') and time.time() - self.last_inference_log_time < 5.0:
+                pass  # Skip logging if less than 5 seconds has passed
+            else:
+                self.last_inference_log_time = time.time()
+                self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms")
+            
             self.step(action)
 
 def main(args=None):
