@@ -28,7 +28,7 @@ class ControlNode(Node):
         self.legs_controller = self.create_publisher(Float64MultiArray, "/position_controller/commands", 10)
 
         # Load PyTorch model
-        self.model_file = "policy_1.pt"
+        self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/policy_1.pt"
         
         # Load TorchScript Model
         self.policy_model = torch.jit.load(self.model_file, map_location="cpu")
@@ -119,14 +119,14 @@ class ControlNode(Node):
             self.angular_velocity,  # Angular velocity (x, y, z)
             self.projected_gravity,
             np.array([self.desired_linear_x, self.desired_angular_z]),  # Desired commands
-            np.array([self.joint_positions[j] for j in self.target_joints[:4]]),
+            np.array([self.joint_positions[joint] for joint in self.target_joints[:4]]),
             np.array([self.joint_velocities[j] for j in self.target_joints]),
             self.previous_action,  # Previous actions
-        ])
+        ]).astype(np.float32)
         return obs
 
     def step(self, action):
-        exec_actions = np.clip(action, -2, 2)
+        exec_actions = np.clip(action, -0.2, 0.2)
         self.previous_action = exec_actions
 
         hip, knee = self.inverse_kinematics(0, self.height)
@@ -153,7 +153,7 @@ class ControlNode(Node):
         if msg.state:
             # action = None
             obs = self.get_obs()
-            obs_tensor = torch.tensor(obs).unsqueeze()
+            obs_tensor = torch.tensor(obs).unsqueeze(0)
             with torch.no_grad():
                 action = self.policy_model(obs_tensor).numpy().flatten()
             self.step(action)
