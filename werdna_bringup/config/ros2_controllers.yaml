@@ -39,6 +39,6 @@ odometry_broadcaster:
 
     wheel_separation: 0.3356
 
-    wheel_radius: 0.06
+    wheel_radius: 0.0855
     
   
