@@ -217,7 +217,7 @@ class ControlNode(Node):
             return
         
         # Normal operation if safety is not triggered
-        exec_actions = np.clip(action, -0.17, 0.17)
+        exec_actions = np.clip(action, -0.085, 0.085)
         self.previous_action = np.clip(action, -2, 2)
 
         hip, knee = self.inverse_kinematics(0, self.height)
@@ -280,6 +280,8 @@ class ControlNode(Node):
                 self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms, Actions: {self.previous_action}")
             
             self.step(action)
+        else:
+            self.step(np.array([0.0,0.0]))
 
 def main(args=None):
     rclpy.init(args=args)
