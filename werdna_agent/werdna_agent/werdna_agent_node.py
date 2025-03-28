@@ -156,8 +156,8 @@ class ControlNode(Node):
         for joint in self.target_joints:
             if joint in positions:
                 if joint in ["left_wheel_joint", "right_wheel_joint"]:
-                    self.joint_positions[joint] = -positions[joint]
-                    self.joint_velocities[joint] = -velocities[joint]
+                    self.joint_positions[joint] = positions[joint]
+                    self.joint_velocities[joint] = velocities[joint]
                 else:
                     self.joint_positions[joint] = positions[joint]
                     self.joint_velocities[joint] = velocities[joint]
@@ -202,7 +202,7 @@ class ControlNode(Node):
             return
         
         # Normal operation if safety is not triggered
-        exec_actions = np.clip(action, -0.025, 0.025)
+        exec_actions = np.clip(action, -0.03, 0.03)
         self.previous_action = np.clip(action, -2, 2)
 
         hip, knee = self.inverse_kinematics(0, self.height)
