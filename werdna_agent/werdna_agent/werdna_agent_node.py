@@ -34,7 +34,7 @@ class ControlNode(Node):
         self.get_logger().info("Publishers initialized")
 
         # Load PyTorch model
-        self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/policy_1.pt"
+        self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/wernda.pt"
         self.get_logger().info(f"Loading TorchScript model from: {self.model_file}")
         
         try:
@@ -217,7 +217,7 @@ class ControlNode(Node):
             return
         
         # Normal operation if safety is not triggered
-        exec_actions = np.clip(action, -0.085, 0.085)
+        exec_actions = np.clip(action, -0.1, 0.1)
         self.previous_action = np.clip(action, -2, 2)
 
         hip, knee = self.inverse_kinematics(0, self.height)
