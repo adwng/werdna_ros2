@@ -125,18 +125,18 @@ class ControlNode(Node):
         # Compute yaw from projected gravity
         projected_yaw = np.arctan2(self.projected_gravity[1], self.projected_gravity[0])  
 
-        # Initialize yaw offset on the first IMU message
-        if not hasattr(self, "yaw_offset"):
+         # Initialize yaw offset on the first IMU message
+        if self.yaw_offset is None:
             self.yaw_offset = projected_yaw  # Store first yaw reading as reference
             self.get_logger().info(f"Yaw offset initialized: {np.degrees(self.yaw_offset):.2f}°")
 
-        # Adjust projected gravity to be relative to initial yaw
-        yaw_corrected_gravity_x = np.cos(-self.yaw_offset) * self.projected_gravity[0] - np.sin(-self.yaw_offset) * self.projected_gravity[1]
-        yaw_corrected_gravity_y = np.sin(-self.yaw_offset) * self.projected_gravity[0] + np.cos(-self.yaw_offset) * self.projected_gravity[1]
-        
-        # Update projected gravity with yaw offset applied
-        self.projected_gravity[0] = yaw_corrected_gravity_x
-        self.projected_gravity[1] = yaw_corrected_gravity_y
+        # Ensure yaw_offset is valid before correction
+        if self.yaw_offset is not None:
+            yaw_corrected_gravity_x = np.cos(-self.yaw_offset) * self.projected_gravity[0] - np.sin(-self.yaw_offset) * self.projected_gravity[1]
+            yaw_corrected_gravity_y = np.sin(-self.yaw_offset) * self.projected_gravity[0] + np.cos(-self.yaw_offset) * self.projected_gravity[1]
+
+            self.projected_gravity[0] = yaw_corrected_gravity_x
+            self.projected_gravity[1] = yaw_corrected_gravity_y
 
         # Extract roll and pitch from quaternion for safety checks
         euler_angles = R.from_quat(base_quat).as_euler('xyz')
