@@ -190,15 +190,15 @@ class ControlNode(Node):
             self.legs_controller.publish(leg_cmd)
             wheel_cmd = Float64MultiArray()
             wheel_cmd.data = [0.0, 0.0]
-            self.wheel_controller.publish(leg_cmd)
+            self.wheel_controller.publish(wheel_cmd)
             
             # Update previous action to zeros
             self.previous_action = np.zeros(2)
             return
         
         # Normal operation if safety is not triggered
-        exec_actions = np.clip(action, -0.2, 0.2)
-        self.previous_action = exec_actions
+        exec_actions = np.clip(action, -0.1, 0.1)
+        self.previous_action = np.clip(action, -2, 2)
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
@@ -208,7 +208,7 @@ class ControlNode(Node):
         leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        wheel_cmd.data = [float(exec_actions[0] * -1.0), float(exec_actions[1] * -1.0)]
+        wheel_cmd.data = [float(exec_actions[0] * 1.0), float(exec_actions[1] * 1.0)]
         
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, knee, hip, knee]
