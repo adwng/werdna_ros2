@@ -70,6 +70,7 @@ class ControlNode(Node):
 
         self.pitch_threshold = 0.7  # ~23 degrees in radians - adjust based on your robot's stability
         self.safety_triggered = False
+        self.yaw_offset = None
         
         self.get_logger().info("Safety parameters configured:")
         self.get_logger().info(f"  - Pitch threshold: {self.pitch_threshold:.2f} radians ({np.degrees(self.pitch_threshold):.1f} degrees)")
@@ -118,27 +119,41 @@ class ControlNode(Node):
 
         rotation_matrix = R.from_quat(base_quat).as_matrix()
 
-        # Compute the projected gravity vector by applying the inverse rotation
+        # Compute the projected gravity vector
         self.projected_gravity = rotation_matrix.T @ gravity_vector
+
+        # Compute yaw from projected gravity
+        projected_yaw = np.arctan2(self.projected_gravity[1], self.projected_gravity[0])  
+
+        # Initialize yaw offset on the first IMU message
+        if not hasattr(self, "yaw_offset"):
+            self.yaw_offset = projected_yaw  # Store first yaw reading as reference
+            self.get_logger().info(f"Yaw offset initialized: {np.degrees(self.yaw_offset):.2f}°")
+
+        # Adjust projected gravity to be relative to initial yaw
+        yaw_corrected_gravity_x = np.cos(-self.yaw_offset) * self.projected_gravity[0] - np.sin(-self.yaw_offset) * self.projected_gravity[1]
+        yaw_corrected_gravity_y = np.sin(-self.yaw_offset) * self.projected_gravity[0] + np.cos(-self.yaw_offset) * self.projected_gravity[1]
         
+        # Update projected gravity with yaw offset applied
+        self.projected_gravity[0] = yaw_corrected_gravity_x
+        self.projected_gravity[1] = yaw_corrected_gravity_y
+
         # Extract roll and pitch from quaternion for safety checks
         euler_angles = R.from_quat(base_quat).as_euler('xyz')
         self.roll = euler_angles[0]
         self.pitch = euler_angles[1]
-        
-        # Log roll and pitch occasionally (every ~1 second to avoid flooding logs)
-        if hasattr(self, 'last_imu_log_time') and time.time() - self.last_imu_log_time < 1.0:
-            pass  # Skip logging if less than 1 second has passed
+
+        # Log periodically
+        if hasattr(self, "last_imu_log_time") and time.time() - self.last_imu_log_time < 1.0:
+            pass
         else:
             self.last_imu_log_time = time.time()
-            roll_deg = np.degrees(self.roll)
-            pitch_deg = np.degrees(self.pitch)
-            self.get_logger().debug(f"IMU orientation - Roll: {roll_deg:.1f}°, Pitch: {pitch_deg:.1f}°")
-        
-        # Check if pitch exceeds threshold and log
+            self.get_logger().debug(f"Adjusted Yaw: {np.degrees(self.yaw_offset):.1f}° | Gravity: {self.projected_gravity}")
+
+        # Safety check
         if abs(self.pitch) > self.pitch_threshold and not self.safety_triggered:
             self.safety_triggered = True
-            self.get_logger().warn(f"SAFETY ALERT: Pitch angle ({np.degrees(self.pitch):.1f}°) exceeds threshold ({np.degrees(self.pitch_threshold):.1f}°). Stopping robot!")
+            self.get_logger().warn(f"SAFETY ALERT: Pitch angle ({np.degrees(self.pitch):.1f}°) exceeds threshold. Stopping robot!")
         elif abs(self.pitch) <= self.pitch_threshold and self.safety_triggered:
             self.safety_triggered = False
             self.get_logger().info(f"Robot back within safe pitch range ({np.degrees(self.pitch):.1f}°). Movement enabled.")
@@ -202,7 +217,7 @@ class ControlNode(Node):
             return
         
         # Normal operation if safety is not triggered
-        exec_actions = np.clip(action, -0.03, 0.03)
+        exec_actions = np.clip(action, -0.17, 0.17)
         self.previous_action = np.clip(action, -2, 2)
 
         hip, knee = self.inverse_kinematics(0, self.height)
