@@ -68,7 +68,7 @@ class ControlNode(Node):
         # Safety parameters
         self.pitch = 0.0
 
-        self.pitch_threshold = 0.4  # ~23 degrees in radians - adjust based on your robot's stability
+        self.pitch_threshold = 0.7  # ~23 degrees in radians - adjust based on your robot's stability
         self.safety_triggered = False
         
         self.get_logger().info("Safety parameters configured:")
@@ -197,7 +197,7 @@ class ControlNode(Node):
             return
         
         # Normal operation if safety is not triggered
-        exec_actions = np.clip(action, -0.1, 0.1)
+        exec_actions = np.clip(action, -0.08, 0.008)
         self.previous_action = np.clip(action, -2, 2)
 
         hip, knee = self.inverse_kinematics(0, self.height)
@@ -257,7 +257,7 @@ class ControlNode(Node):
                 pass  # Skip logging if less than 5 seconds has passed
             else:
                 self.last_inference_log_time = time.time()
-                self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms")
+                self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms, Actions: {self.previous_action}")
             
             self.step(action)
 
