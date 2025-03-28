@@ -155,8 +155,13 @@ class ControlNode(Node):
         # Now save them in our target order
         for joint in self.target_joints:
             if joint in positions:
-                self.joint_positions[joint] = positions[joint]
-                self.joint_velocities[joint] = velocities[joint]
+                if joint in ["left_wheel_joint", "right_wheel_joint"]:
+                    self.joint_positions[joint] = -positions[joint]
+                    self.joint_velocities[joint] = -velocities[joint]
+                else:
+                    self.joint_positions[joint] = positions[joint]
+                    self.joint_velocities[joint] = velocities[joint]
+
         
         # Occasionally log joint positions (every ~5 seconds)
         # if hasattr(self, 'last_joint_log_time') and time.time() - self.last_joint_log_time < 5.0:
@@ -197,7 +202,7 @@ class ControlNode(Node):
             return
         
         # Normal operation if safety is not triggered
-        exec_actions = np.clip(action, -0.035, 0.035)
+        exec_actions = np.clip(action, -0.025, 0.025)
         self.previous_action = np.clip(action, -2, 2)
 
         hip, knee = self.inverse_kinematics(0, self.height)
@@ -208,7 +213,7 @@ class ControlNode(Node):
         leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        wheel_cmd.data = [float(exec_actions[0] * -1.0), float(exec_actions[1] * -1.0)]
+        wheel_cmd.data = [float(exec_actions[0] * 1.0), float(exec_actions[1] * 1.0)]
         
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, knee, hip, knee]
