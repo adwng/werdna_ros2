@@ -24,7 +24,7 @@ class ControlNode(Node):
         self.get_logger().info("Setting up subscribers...")
         self.imu_subscriber = self.create_subscription(Imu, 'odometry_broadcaster/imu', self.imu_callback, 10)
         self.joint_subscriber = self.create_subscription(JointState, '/joint_states', self.joint_callback, 10)
-        self.command_subscriber = self.create_subscription(JoyCtrlCmds, '/werdna_control', self.command_callback, 10)
+        self.command_subscriber = self.create_subscription(JoyCtrlCmds, '/werdna_control', self.command_callback, 50)
         self.get_logger().info("Subscribers initialized")
 
         # Publishers
@@ -197,7 +197,7 @@ class ControlNode(Node):
             return
         
         # Normal operation if safety is not triggered
-        exec_actions = np.clip(action, -0.08, 0.008)
+        exec_actions = np.clip(action, -0.035, 0.035)
         self.previous_action = np.clip(action, -2, 2)
 
         hip, knee = self.inverse_kinematics(0, self.height)
@@ -208,7 +208,7 @@ class ControlNode(Node):
         leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        wheel_cmd.data = [float(exec_actions[0] * 1.0), float(exec_actions[1] * 1.0)]
+        wheel_cmd.data = [float(exec_actions[0] * -1.0), float(exec_actions[1] * -1.0)]
         
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, knee, hip, knee]
