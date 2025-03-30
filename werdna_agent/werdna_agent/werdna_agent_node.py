@@ -34,7 +34,7 @@ class ControlNode(Node):
         self.get_logger().info("Publishers initialized")
 
         # Load PyTorch model
-        self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/wernda.pt"
+        self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/werdna.pt"
         self.get_logger().info(f"Loading TorchScript model from: {self.model_file}")
         
         try:
@@ -53,6 +53,7 @@ class ControlNode(Node):
         self.get_logger().info(f"Target joints configured: {self.target_joints}")
 
         # Robot state variables
+        self.current_state = False
         self.height = 0
         self.left_wheel = 0
         self.right_wheel = 0
@@ -63,7 +64,16 @@ class ControlNode(Node):
         self.projected_gravity = np.array([0.0, 0.0, 0.0])
         self.joint_positions = {joint: 0.0 for joint in self.target_joints}
         self.joint_velocities = {joint: 0.0 for joint in self.target_joints}
-        self.previous_action = np.zeros(2)  # 4 joints + 2 wheels
+        self.previous_action = np.zeros(2)  # 2 wheels
+        self.previous_action_scaled = np.zeros(2)
+
+        # Parameters
+        self.alpha = 0.7 # smoothing factor
+        self.max_torque = 0.1 #Nm
+        self.min_torque = -0.1 #Nm
+        self.max_velocity = 1.0 #rad/s
+        self.high_velocity_reduction = 0.5
+        self.damping_factor = 0.1 
         
         # Safety parameters
         self.pitch = 0.0
@@ -76,6 +86,96 @@ class ControlNode(Node):
         self.get_logger().info(f"  - Pitch threshold: {self.pitch_threshold:.2f} radians ({np.degrees(self.pitch_threshold):.1f} degrees)")
         
         self.get_logger().info("Werdna Control Node initialization complete!")
+
+        timer_period = 0.1 # every 0.1 seconds // 100Hz
+        self.runtime = self.create_timer(timer_period, self.runtime_callback)
+    
+    def runtime_callback(self):
+         if self.current_state:
+            if self.policy_model is None:
+                self.get_logger().error("Cannot execute command: Model not loaded correctly")
+                return
+                
+            # action = None
+            obs = self.get_obs()
+            obs_tensor = torch.tensor(obs).unsqueeze(0)
+            
+            # Measure inference time
+            start_time = time.time()
+            with torch.no_grad():
+                action = self.policy_model(obs_tensor).numpy().flatten()
+            inference_time = time.time() - start_time
+            
+            # Log inference time occasionally
+            if hasattr(self, 'last_inference_log_time') and time.time() - self.last_inference_log_time < 5.0:
+                pass  # Skip logging if less than 5 seconds has passed
+            else:
+                self.last_inference_log_time = time.time()
+                self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms, Actions: {self.previous_action}")
+            
+            self.step(action)
+        else:
+            self.step(np.array([0.0,0.0]))
+
+    def step(self, action):
+        # Check if safety stop is triggered due to excessive pitch
+        if self.safety_triggered:
+            self.get_logger().warn("Safety stop active: Robot pitch exceeds threshold. Sending zero action.")
+            # Send the robot to a safe position with wheels stopped
+            hip, knee = self.inverse_kinematics(0.0,0.01)  # Ensure some minimum height for stability
+            leg_cmd = Float64MultiArray()
+            leg_cmd.data = [float(hip), float(knee), float(hip), float(knee)]
+            self.legs_controller.publish(leg_cmd)
+            wheel_cmd = Float64MultiArray()
+            wheel_cmd.data = [0.0, 0.0]
+            self.wheel_controller.publish(wheel_cmd)
+            
+            # Update previous action to zeros
+            self.previous_action = np.zeros(2)
+            return
+
+        exec_actions = action
+
+        # current wheel velocities
+        wheel_vel_left = self.joint_velocities["left_wheel_joint"]
+        wheel_vel_right = self.joint_velocities["right_wheel_joint"]
+
+        # Applu velocity based torque reduction
+        if abs(wheel_vel_left) > self.max_velocity or abs(wheel_vel_right) > self.max_velocity:
+            exec_actions *= self.high_velocity_reduction
+        
+        # Compute damping torque
+        damping_torque = self.damping_factor * np.array([wheel_vel_left, wheel_vel_right])
+        
+        # Apply damping to action
+        exec_actions -= damping_torque
+        
+        # Smooth action using EMA
+        if hasattr(self, "previous_action_scaled"):
+            exec_actions = self.alpha * self.previous_action_scaled + (1 - self.alpha) * exec_actions
+        else:
+            self.previous_action_scaled = exec_actions
+        
+        # Clamp torques within limits
+        exec_actions = np.clip(exec_actions, self.min_torque, self.max_torque)
+                
+        self.previous_action = np.clip(action, -1, 1)
+
+        hip, knee = self.inverse_kinematics(0, self.height)
+
+        # self.get_logger().info(f"Actions (0): {exec_actions[0]:.3f}, Actions (1): {exec_actions[1]:.3f}, Height: {self.height:.3f}")
+
+        wheel_cmd = Float64MultiArray()
+        leg_cmd = Float64MultiArray()
+
+        # First two actions control wheels
+        wheel_cmd.data = [float(exec_actions[0] * 1.0), float(exec_actions[1] * 1.0)]
+        
+        # Remaining actions control the leg joints
+        leg_cmd.data = [hip, knee, hip, knee]
+        
+        self.wheel_controller.publish(wheel_cmd)
+        self.legs_controller.publish(leg_cmd)
     
     def inverse_kinematics(self, x=0, y=0):
         try:
@@ -199,43 +299,6 @@ class ControlNode(Node):
         ]).astype(np.float32)
         return obs
 
-    def step(self, action):
-        # Check if safety stop is triggered due to excessive pitch
-        if self.safety_triggered:
-            self.get_logger().warn("Safety stop active: Robot pitch exceeds threshold. Sending zero action.")
-            # Send the robot to a safe position with wheels stopped
-            hip, knee = self.inverse_kinematics(0.0,0.01)  # Ensure some minimum height for stability
-            leg_cmd = Float64MultiArray()
-            leg_cmd.data = [float(hip), float(knee), float(hip), float(knee)]
-            self.legs_controller.publish(leg_cmd)
-            wheel_cmd = Float64MultiArray()
-            wheel_cmd.data = [0.0, 0.0]
-            self.wheel_controller.publish(wheel_cmd)
-            
-            # Update previous action to zeros
-            self.previous_action = np.zeros(2)
-            return
-        
-        # Normal operation if safety is not triggered
-        exec_actions = np.clip(action, -0.1, 0.1)
-        self.previous_action = np.clip(action, -2, 2)
-
-        hip, knee = self.inverse_kinematics(0, self.height)
-
-        # self.get_logger().info(f"Actions (0): {exec_actions[0]:.3f}, Actions (1): {exec_actions[1]:.3f}, Height: {self.height:.3f}")
-
-        wheel_cmd = Float64MultiArray()
-        leg_cmd = Float64MultiArray()
-
-        # First two actions control wheels
-        wheel_cmd.data = [float(exec_actions[0] * 1.0), float(exec_actions[1] * 1.0)]
-        
-        # Remaining actions control the leg joints
-        leg_cmd.data = [hip, knee, hip, knee]
-        
-        self.wheel_controller.publish(wheel_cmd)
-        self.legs_controller.publish(leg_cmd)
-
     def command_callback(self, msg):
         # Store previous values for change detection
         prev_height = self.height
@@ -254,34 +317,12 @@ class ControlNode(Node):
             prev_linear_x != self.desired_linear_x or 
             prev_angular_z != self.desired_angular_z or
             prev_state != msg.state):
+
+            self.current_state = msg.state
             
             self.get_logger().info(f"Received command - Height: {self.height:.2f}, Linear X: {self.desired_linear_x:.2f}, Angular Z: {self.desired_angular_z:.2f}, State: {msg.state}")
         
-        if msg.state:
-            if self.policy_model is None:
-                self.get_logger().error("Cannot execute command: Model not loaded correctly")
-                return
-                
-            # action = None
-            obs = self.get_obs()
-            obs_tensor = torch.tensor(obs).unsqueeze(0)
-            
-            # Measure inference time
-            start_time = time.time()
-            with torch.no_grad():
-                action = self.policy_model(obs_tensor).numpy().flatten()
-            inference_time = time.time() - start_time
-            
-            # Log inference time occasionally
-            if hasattr(self, 'last_inference_log_time') and time.time() - self.last_inference_log_time < 5.0:
-                pass  # Skip logging if less than 5 seconds has passed
-            else:
-                self.last_inference_log_time = time.time()
-                self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms, Actions: {self.previous_action}")
-            
-            self.step(action)
-        else:
-            self.step(np.array([0.0,0.0]))
+       
 
 def main(args=None):
     rclpy.init(args=args)
