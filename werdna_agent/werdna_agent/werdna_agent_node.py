@@ -68,7 +68,7 @@ class ControlNode(Node):
         self.previous_action_scaled = np.zeros(2)
 
         # Parameters
-        self.alpha = 0.7 # smoothing factor
+        self.alpha = 0.5 # smoothing factor
         self.max_torque = 0.1 #Nm
         self.min_torque = -0.1 #Nm
         self.max_velocity = 1.0 #rad/s
@@ -78,7 +78,7 @@ class ControlNode(Node):
         # Safety parameters
         self.pitch = 0.0
 
-        self.pitch_threshold = 0.7  # ~23 degrees in radians - adjust based on your robot's stability
+        self.pitch_threshold = 0.7  
         self.safety_triggered = False
         self.yaw_offset = None
         
@@ -87,11 +87,11 @@ class ControlNode(Node):
         
         self.get_logger().info("Werdna Control Node initialization complete!")
 
-        timer_period = 0.1 # every 0.1 seconds // 100Hz
+        timer_period = 0.02 # every 0.02 seconds //50Hz
         self.runtime = self.create_timer(timer_period, self.runtime_callback)
     
     def runtime_callback(self):
-         if self.current_state:
+        if self.current_state:
             if self.policy_model is None:
                 self.get_logger().error("Cannot execute command: Model not loaded correctly")
                 return
