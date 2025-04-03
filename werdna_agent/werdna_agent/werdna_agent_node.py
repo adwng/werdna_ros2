@@ -24,7 +24,7 @@ class ControlNode(Node):
         self.get_logger().info("Setting up subscribers...")
         self.imu_subscriber = self.create_subscription(Imu, 'odometry_broadcaster/imu', self.imu_callback, 10)
         self.joint_subscriber = self.create_subscription(JointState, '/joint_states', self.joint_callback, 10)
-        self.command_subscriber = self.create_subscription(JoyCtrlCmds, '/werdna_control', self.command_callback, 50)
+        self.command_subscriber = self.create_subscription(JoyCtrlCmds, '/werdna_control', self.command_callback, 10)
         self.get_logger().info("Subscribers initialized")
 
         # Publishers
@@ -68,12 +68,12 @@ class ControlNode(Node):
         self.previous_action_scaled = np.zeros(2)
 
         # Parameters
-        self.alpha = 0.5 # smoothing factor
+        self.alpha = 0.1 # smoothing factor
         self.max_torque = 0.1 #Nm
         self.min_torque = -0.1 #Nm
         self.max_velocity = 1.0 #rad/s
         self.high_velocity_reduction = 0.5
-        self.damping_factor = 0.1 
+        self.damping_factor = 0.2
         
         # Safety parameters
         self.pitch = 0.0
@@ -87,7 +87,7 @@ class ControlNode(Node):
         
         self.get_logger().info("Werdna Control Node initialization complete!")
 
-        timer_period = 0.02 # every 0.02 seconds //50Hz
+        timer_period = 0.01 # every 0.02 seconds //50Hz
         self.runtime = self.create_timer(timer_period, self.runtime_callback)
     
     def runtime_callback(self):
