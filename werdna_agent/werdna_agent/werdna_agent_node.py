@@ -34,7 +34,7 @@ class ControlNode(Node):
         self.get_logger().info("Publishers initialized")
 
         # Load PyTorch model
-        self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/werdna.pt"
+        self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/policy_1.pt"
         self.get_logger().info(f"Loading TorchScript model from: {self.model_file}")
         
         try:
@@ -107,7 +107,7 @@ class ControlNode(Node):
             inference_time = time.time() - start_time
             
             # Log inference time occasionally
-            if hasattr(self, 'last_inference_log_time') and time.time() - self.last_inference_log_time < 5.0:
+            if hasattr(self, 'last_inference_log_time') and time.time() - self.last_inference_log_time < 1.0:
                 pass  # Skip logging if less than 5 seconds has passed
             else:
                 self.last_inference_log_time = time.time()
