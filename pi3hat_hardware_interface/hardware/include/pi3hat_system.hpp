@@ -97,9 +97,11 @@ private:
     // Actuator states
     std::vector<double> hw_state_positions_;
     std::vector<double> hw_state_velocities_;
+    std::vector<double> hw_state_efforts_;
 
     // Actuator commands
     std::vector<double> hw_command_positions_;
+    std::vector<double> hw_command_velocities_;
     std::vector<double> hw_command_efforts_;
 };
 

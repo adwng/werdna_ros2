@@ -120,6 +120,14 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
             options.position_format.kp_scale = mjbots::moteus::kInt8;
             options.position_format.kd_scale = mjbots::moteus::kInt8;
         }
+        else if (control_modes_[i] == "velocity")
+        {
+            options.position_format.position = mjbots::moteus::kIgnore;
+            options.position_format.velocity = mjbots::moteus::kFloat;
+            options.position_format.feedforward_torque = mjbots::moteus::kIgnore;
+            options.position_format.kp_scale = mjbots::moteus::kInt8;
+            options.position_format.kd_scale = mjbots::moteus::kInt8;
+        }
         else if (control_modes_[i] == "position")
         {
             options.position_format.position = mjbots::moteus::kFloat;
@@ -164,6 +172,8 @@ std::vector<hardware_interface::StateInterface> Pi3HatControlHardware::export_st
             info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_state_positions_[i]));
         state_interfaces.emplace_back(hardware_interface::StateInterface(
             info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &hw_state_velocities_[i]));
+        state_interfaces.emplace_back(hardware_interface::StateInterface(
+            info_.joints[i].name, hardware_interface::HW_IF_EFFORT, & hw_state_efforts_[i]));
     }
 
     //Add IMU State Interfaces
@@ -208,6 +218,11 @@ std::vector<hardware_interface::CommandInterface> Pi3HatControlHardware::export_
             command_interfaces.emplace_back(hardware_interface::CommandInterface(
                 info_.joints[i].name, hardware_interface::HW_IF_EFFORT, &hw_command_efforts_[i]));
         }
+        else if (control_modes_[i] == "velocity")
+        {
+            command_interfaces.emplace_back(hardware_interface::CommandInterface(
+                info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &hw_command_velocities_[i]));
+        }
         else
         {
             RCLCPP_ERROR(rclcpp::get_logger("Pi3HatControlHardware"), 
@@ -235,6 +250,10 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_configure(
         else if (control_modes_[i] == "effort")
         {
             hw_command_efforts_[i] = 0.0;
+        }
+        else if (control_modes_[i] == "velocity")
+        {
+            hw_command_velocities_[i] = 0.0;
         }
      }
 
@@ -301,6 +320,12 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
                         "NaN effort command for actuator %zu", i);
             continue;
         }
+        else if (control_modes_[i] == "velocity" && std::isnan(hw_command_velocities_[i]))
+        {
+            RCLCPP_WARN(rclcpp::get_logger("Pi3HatControlHardware"), 
+                        "NaN velocity command for actuator %zu", i);
+            continue;
+        }
 
         double computed_cmd;
 
@@ -320,6 +345,12 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
             cmd.kp_scale = 0.0f;
             cmd.kd_scale = 0.0f;
             cmd.feedforward_torque = hw_command_efforts_[i];
+        }
+        else if (control_modes_[i] == "velocity") 
+        {
+            cmd.kp_scale = 0.0f;
+            cmd.kd_scale = 1.0f;
+            cmd.velocity = hw_command_velocities_[i];
         }
 
         send_frames.push_back(controllers[i]->MakePosition(cmd));
@@ -347,7 +378,8 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
             {   
                 double p_des;
                 double v_des;
-                
+                double e_des;
+
                 auto maybe_servo = mjbots::moteus::Query::Parse(it->data, it->size);
                 
                 const auto& v = maybe_servo;
@@ -356,15 +388,18 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
                 {
                     p_des = ((v.position - hw_actuator_position_offsets_[i])/9.0) * 2 * M_PI;
                     v_des = (v.velocity)/9;
+                    e_des = v.effort;
                 }
                 else{
                     p_des = v.position;
                     v_des = v.velocity;
+                    e_des = v.effort;
                 }
 
                 hw_state_positions_[i] = p_des;
                 hw_state_velocities_[i] = v_des;
-
+                hw_state_efforts_[i] = e_des;
+                
                 // RCLCPP_INFO(
                 //     rclcpp::get_logger("Pi3HatControlHardware"),
                 //     "Joint: %s, Command Type: %s, Mode: %2d, Command: %.3f, Position: %.3f, Velocity: %.3f, Fault:\r",

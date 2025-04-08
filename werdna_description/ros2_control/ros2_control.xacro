@@ -61,7 +61,7 @@
             <param name="can_channel">1</param>
             <param name="can_id">3</param>
             <param name="position_offset">0.0</param>
-            <param name="control_mode">effort</param>
+            <param name="control_mode">velocity</param>
             
         </joint>
 
@@ -73,7 +73,7 @@
             <param name="can_channel">2</param>
             <param name="can_id">6</param>
             <param name="position_offset">-0.0</param>
-            <param name="control_mode">effort</param>
+            <param name="control_mode">velocity</param>
         </joint>
 
     <sensor name="imu_sensor">

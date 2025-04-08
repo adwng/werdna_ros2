@@ -34,7 +34,7 @@ class ControlNode(Node):
         self.get_logger().info("Publishers initialized")
 
         # Load PyTorch model
-        self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/policy_1.pt"
+        self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/policy_velocity.pt"
         self.get_logger().info(f"Loading TorchScript model from: {self.model_file}")
         
         try:
@@ -65,15 +65,10 @@ class ControlNode(Node):
         self.joint_positions = {joint: 0.0 for joint in self.target_joints}
         self.joint_velocities = {joint: 0.0 for joint in self.target_joints}
         self.previous_action = np.zeros(2)  # 2 wheels
-        self.previous_action_scaled = np.zeros(2)
 
         # Parameters
-        self.alpha = 0.45 # smoothing factor
-        self.max_torque = 0.1#Nm
-        self.min_torque = -0.1 #Nm
-        self.max_velocity = 1.0 #rad/s
-        self.high_velocity_reduction = 0.1
-        self.damping_factor = 0.08
+        self.wheel_joint_torque_limit = 2.0
+        self.wheel_joint_damping = 1.0
         
         # Safety parameters
         self.pitch = 0.0
@@ -111,7 +106,8 @@ class ControlNode(Node):
                 pass  # Skip logging if less than 5 seconds has passed
             else:
                 self.last_inference_log_time = time.time()
-                self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms, Actions Unscaled: {self.previous_action}, Actions Scaled: {self.previous_action_scaled}")
+                self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms")
+                self.get_logger().info(f"Current Observation {obs}")
                 # hip_pos = self.joint_positions['left_hip_motor_joint']
                 # knee_pos = self.joint_positions['left_knee_joint']
                 # wheel_vel = self.joint_velocities['left_wheel_joint']
@@ -132,54 +128,41 @@ class ControlNode(Node):
             leg_cmd = Float64MultiArray()
             leg_cmd.data = [float(hip), float(knee), float(hip), float(knee)]
             self.legs_controller.publish(leg_cmd)
-            wheel_cmd = Float64MultiArray()
-            wheel_cmd.data = [0.0, 0.0]
-            self.wheel_controller.publish(wheel_cmd)
+            # wheel_cmd = Float64MultiArray()
+            # wheel_cmd.data = [0.0, 0.0]
+            # self.wheel_controller.publish(wheel_cmd)
             
             # Update previous action to zeros
             self.previous_action = np.zeros(2)
-            self.previous_action_scaled = np.zeros(2)
             return
-
-        exec_actions = action
-        self.previous_action = action
+        
+        velocity_des = np.zeros(2)
+        exec_actions = np.clip(action, -100.0, 100.0)
 
         # current wheel velocities
-        # wheel_vel_left = self.joint_velocities["left_wheel_joint"]
-        # wheel_vel_right = self.joint_velocities["right_wheel_joint"]
+        joint_vel = np.array([self.joint_velocities["left_wheel_joint"], self.joint_velocities["right_wheel_joint"]])
 
-        # Applu velocity based torque reduction
-        # if abs(wheel_vel_left) > self.max_velocity or abs(wheel_vel_right) > self.max_velocity:
-        #     exec_actions *= self.high_velocity_reduction
-        
-        # Compute damping torque
-        damping_torque = self.damping_factor
-        
-        # Apply damping to action
-        exec_actions *= damping_torque
-        
-        # Smooth action using EMA
-        exec_actions = self.alpha * self.previous_action_scaled + (1 - self.alpha) * exec_actions
-        
-        # Clamp torques within limits
-        exec_actions = np.clip(exec_actions, self.min_torque, self.max_torque)
-        
-        self.previous_action_scaled = exec_actions
+        for i in range(len(joint_vel)):
+            action_min = joint_vel[i] - self.wheel_joint_torque_limit/self.wheel_joint_damping
+            action_max = joint_vel[i] + self.wheel_joint_torque_limit/self.wheel_joint_damping
+            self.previous_action[i] = exec_actions[i]
+            exec_actions[i] = max(action_min/self.wheel_joint_damping, min(action_max / self.wheel_joint_damping, exec_actions[i]))
+            velocity_des[i] = exec_actions[i] * self.wheel_joint_damping
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
-        # self.get_logger().info(f"Actions (0): {exec_actions[0]:.3f}, Actions (1): {exec_actions[1]:.3f}, Height: {self.height:.3f}")
+        self.get_logger().info(f"Actions (0): {velocity_des[0]:.3f}, Actions (1): {velocity_des[1]:.3f}, Height: {self.height:.3f}")
 
-        wheel_cmd = Float64MultiArray()
+        # wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        wheel_cmd.data = [float(exec_actions[0] * 1.0), float(exec_actions[1] * 1.0)]
+        # wheel_cmd.data = [float(velocity_des[0] * 1.0), float(velocity_des[1] * 1.0)]
         
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, knee, hip, knee]
         
-        self.wheel_controller.publish(wheel_cmd)
+        # self.wheel_controller.publish(wheel_cmd)
         self.legs_controller.publish(leg_cmd)
     
     def inverse_kinematics(self, x=0, y=0):
