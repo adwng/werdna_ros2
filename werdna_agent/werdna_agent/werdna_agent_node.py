@@ -68,12 +68,12 @@ class ControlNode(Node):
         self.previous_action_scaled = np.zeros(2)
 
         # Parameters
-        self.alpha = 0.1 # smoothing factor
-        self.max_torque = 0.1 #Nm
+        self.alpha = 0.45 # smoothing factor
+        self.max_torque = 0.1#Nm
         self.min_torque = -0.1 #Nm
         self.max_velocity = 1.0 #rad/s
-        self.high_velocity_reduction = 0.5
-        self.damping_factor = 0.2
+        self.high_velocity_reduction = 0.1
+        self.damping_factor = 0.08
         
         # Safety parameters
         self.pitch = 0.0
@@ -111,7 +111,13 @@ class ControlNode(Node):
                 pass  # Skip logging if less than 5 seconds has passed
             else:
                 self.last_inference_log_time = time.time()
-                self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms, Actions: {self.previous_action}")
+                self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms, Actions Unscaled: {self.previous_action}, Actions Scaled: {self.previous_action_scaled}")
+                # hip_pos = self.joint_positions['left_hip_motor_joint']
+                # knee_pos = self.joint_positions['left_knee_joint']
+                # wheel_vel = self.joint_velocities['left_wheel_joint']
+                # self.get_logger().info(f"Joint state - Hip: {hip_pos:.2f} rad, Knee: {knee_pos:.2f} rad, Wheel vel: {wheel_vel:.2f} rad/s")
+                # self.get_logger().info(f"Base Angular Velocity: {self.angular_velocity}")
+                # self.get_logger().info(f"Projected Gravity: {self.projected_gravity}")
             
             self.step(action)
         else:
@@ -120,7 +126,7 @@ class ControlNode(Node):
     def step(self, action):
         # Check if safety stop is triggered due to excessive pitch
         if self.safety_triggered:
-            self.get_logger().warn("Safety stop active: Robot pitch exceeds threshold. Sending zero action.")
+            # self.get_logger().warn("Safety stop active: Robot pitch exceeds threshold. Sending zero action.")
             # Send the robot to a safe position with wheels stopped
             hip, knee = self.inverse_kinematics(0.0,0.01)  # Ensure some minimum height for stability
             leg_cmd = Float64MultiArray()
@@ -132,34 +138,33 @@ class ControlNode(Node):
             
             # Update previous action to zeros
             self.previous_action = np.zeros(2)
+            self.previous_action_scaled = np.zeros(2)
             return
 
         exec_actions = action
+        self.previous_action = action
 
         # current wheel velocities
-        wheel_vel_left = self.joint_velocities["left_wheel_joint"]
-        wheel_vel_right = self.joint_velocities["right_wheel_joint"]
+        # wheel_vel_left = self.joint_velocities["left_wheel_joint"]
+        # wheel_vel_right = self.joint_velocities["right_wheel_joint"]
 
         # Applu velocity based torque reduction
-        if abs(wheel_vel_left) > self.max_velocity or abs(wheel_vel_right) > self.max_velocity:
-            exec_actions *= self.high_velocity_reduction
+        # if abs(wheel_vel_left) > self.max_velocity or abs(wheel_vel_right) > self.max_velocity:
+        #     exec_actions *= self.high_velocity_reduction
         
         # Compute damping torque
-        damping_torque = self.damping_factor * np.array([wheel_vel_left, wheel_vel_right])
+        damping_torque = self.damping_factor
         
         # Apply damping to action
-        exec_actions -= damping_torque
+        exec_actions *= damping_torque
         
         # Smooth action using EMA
-        if hasattr(self, "previous_action_scaled"):
-            exec_actions = self.alpha * self.previous_action_scaled + (1 - self.alpha) * exec_actions
-        else:
-            self.previous_action_scaled = exec_actions
+        exec_actions = self.alpha * self.previous_action_scaled + (1 - self.alpha) * exec_actions
         
         # Clamp torques within limits
         exec_actions = np.clip(exec_actions, self.min_torque, self.max_torque)
-                
-        self.previous_action = np.clip(action, -1, 1)
+        
+        self.previous_action_scaled = exec_actions
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
@@ -270,23 +275,9 @@ class ControlNode(Node):
         # Now save them in our target order
         for joint in self.target_joints:
             if joint in positions:
-                if joint in ["left_wheel_joint", "right_wheel_joint"]:
-                    self.joint_positions[joint] = positions[joint]
-                    self.joint_velocities[joint] = velocities[joint]
-                else:
-                    self.joint_positions[joint] = positions[joint]
-                    self.joint_velocities[joint] = velocities[joint]
+                self.joint_positions[joint] = positions[joint]
+                self.joint_velocities[joint] = velocities[joint]
 
-        
-        # Occasionally log joint positions (every ~5 seconds)
-        # if hasattr(self, 'last_joint_log_time') and time.time() - self.last_joint_log_time < 5.0:
-        #     pass  # Skip logging if less than 5 seconds has passed
-        # else:
-        #     self.last_joint_log_time = time.time()
-        #     hip_pos = self.joint_positions['left_hip_motor_joint']
-        #     knee_pos = self.joint_positions['left_knee_joint']
-        #     wheel_vel = self.joint_velocities['left_wheel_joint']
-        #     self.get_logger().debug(f"Joint state - Hip: {hip_pos:.2f} rad, Knee: {knee_pos:.2f} rad, Wheel vel: {wheel_vel:.2f} rad/s")
 
     def get_obs(self):
         obs = np.concatenate([
