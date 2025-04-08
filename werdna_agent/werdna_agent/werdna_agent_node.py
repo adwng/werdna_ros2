@@ -68,7 +68,7 @@ class ControlNode(Node):
         self.velocity_des = np.zeros(2)
 
         # Parameters
-        self.wheel_joint_torque_limit = 3.0
+        self.wheel_joint_torque_limit = 1.68
         self.wheel_joint_damping = 1.0
         
         # Safety parameters
@@ -111,7 +111,7 @@ class ControlNode(Node):
                     "\n========== POLICY INFERENCE ==========\n"
                     f"Inference time: {inference_time*1000:.2f} ms\n"
                     f"Actions: {action}\n"
-                    f"Velocity Desired     : {self.velocity_des}"
+                    f"Velocity Desired     : {self.velocity_des}\n"
                     f"Observations:\n"
                     f"  - Angular Velocity   : {self.angular_velocity}\n"
                     f"  - Projected Gravity  : {self.projected_gravity}\n"
@@ -275,7 +275,7 @@ class ControlNode(Node):
             self.projected_gravity,
             np.array([self.desired_linear_x, self.desired_angular_z]),  # Desired commands
             np.array([self.joint_positions[joint] for joint in self.target_joints[:4]]),
-            np.array([self.joint_velocities[j] for j in self.target_joints]),
+            np.array([self.joint_velocities[j] for j in self.target_joints]) * 0.5,
             self.previous_action,  # Previous actions
         ]).astype(np.float32)
         return obs
