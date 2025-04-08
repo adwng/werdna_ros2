@@ -27,9 +27,12 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
 
     hw_state_positions_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
     hw_state_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+    hw_state_efforts_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+
 
     hw_command_positions_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
     hw_command_efforts_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
+    hw_command_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
     for (const hardware_interface::ComponentInfo & joint : info_.joints)
     {
@@ -388,12 +391,12 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
                 {
                     p_des = ((v.position - hw_actuator_position_offsets_[i])/9.0) * 2 * M_PI;
                     v_des = (v.velocity)/9;
-                    e_des = v.effort;
+                    e_des = v.torque;
                 }
                 else{
                     p_des = v.position;
                     v_des = v.velocity;
-                    e_des = v.effort;
+                    e_des = v.torque;
                 }
 
                 hw_state_positions_[i] = p_des;

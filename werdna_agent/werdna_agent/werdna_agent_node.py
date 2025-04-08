@@ -65,9 +65,10 @@ class ControlNode(Node):
         self.joint_positions = {joint: 0.0 for joint in self.target_joints}
         self.joint_velocities = {joint: 0.0 for joint in self.target_joints}
         self.previous_action = np.zeros(2)  # 2 wheels
+        self.velocity_des = np.zeros(2)
 
         # Parameters
-        self.wheel_joint_torque_limit = 2.0
+        self.wheel_joint_torque_limit = 3.0
         self.wheel_joint_damping = 1.0
         
         # Safety parameters
@@ -82,7 +83,7 @@ class ControlNode(Node):
         
         self.get_logger().info("Werdna Control Node initialization complete!")
 
-        timer_period = 0.01 # every 0.02 seconds //50Hz
+        timer_period = 0.02 # every 0.02 seconds //50Hz
         self.runtime = self.create_timer(timer_period, self.runtime_callback)
     
     def runtime_callback(self):
@@ -106,15 +107,21 @@ class ControlNode(Node):
                 pass  # Skip logging if less than 5 seconds has passed
             else:
                 self.last_inference_log_time = time.time()
-                self.get_logger().info(f"Model inference completed in {inference_time*1000:.2f} ms")
-                self.get_logger().info(f"Current Observation {obs}")
-                # hip_pos = self.joint_positions['left_hip_motor_joint']
-                # knee_pos = self.joint_positions['left_knee_joint']
-                # wheel_vel = self.joint_velocities['left_wheel_joint']
-                # self.get_logger().info(f"Joint state - Hip: {hip_pos:.2f} rad, Knee: {knee_pos:.2f} rad, Wheel vel: {wheel_vel:.2f} rad/s")
-                # self.get_logger().info(f"Base Angular Velocity: {self.angular_velocity}")
-                # self.get_logger().info(f"Projected Gravity: {self.projected_gravity}")
-            
+                self.get_logger().info(
+                    "\n========== POLICY INFERENCE ==========\n"
+                    f"Inference time: {inference_time*1000:.2f} ms\n"
+                    f"Actions: {action}\n"
+                    f"Velocity Desired     : {self.velocity_des}"
+                    f"Observations:\n"
+                    f"  - Angular Velocity   : {self.angular_velocity}\n"
+                    f"  - Projected Gravity  : {self.projected_gravity}\n"
+                    f"  - Desired Linear X   : {self.desired_linear_x:.2f}\n"
+                    f"  - Desired Angular Z  : {self.desired_angular_z:.2f}\n"
+                    f"  - Joint Positions    : {[round(self.joint_positions[j], 3) for j in self.target_joints[:4]]}\n"
+                    f"  - Joint Velocities   : {[round(self.joint_velocities[j], 3) for j in self.target_joints]}\n"
+                    f"  - Previous Actions   : {self.previous_action}\n"
+                    "======================================"
+                )
             self.step(action)
         else:
             self.step(np.array([0.0,0.0]))
@@ -136,7 +143,7 @@ class ControlNode(Node):
             self.previous_action = np.zeros(2)
             return
         
-        velocity_des = np.zeros(2)
+        # velocity_des = np.zeros(2)
         exec_actions = np.clip(action, -100.0, 100.0)
 
         # current wheel velocities
@@ -147,22 +154,22 @@ class ControlNode(Node):
             action_max = joint_vel[i] + self.wheel_joint_torque_limit/self.wheel_joint_damping
             self.previous_action[i] = exec_actions[i]
             exec_actions[i] = max(action_min/self.wheel_joint_damping, min(action_max / self.wheel_joint_damping, exec_actions[i]))
-            velocity_des[i] = exec_actions[i] * self.wheel_joint_damping
+            self.velocity_des[i] = exec_actions[i] * self.wheel_joint_damping
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
-        self.get_logger().info(f"Actions (0): {velocity_des[0]:.3f}, Actions (1): {velocity_des[1]:.3f}, Height: {self.height:.3f}")
+        # self.get_logger().info(f"Actions (0): {velocity_des[0]:.3f}, Actions (1): {velocity_des[1]:.3f}, Height: {self.height:.3f}")
 
-        # wheel_cmd = Float64MultiArray()
+        wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        # wheel_cmd.data = [float(velocity_des[0] * 1.0), float(velocity_des[1] * 1.0)]
+        wheel_cmd.data = [float(self.velocity_des[0] * 1.0), float(self.velocity_des[1] * 1.0)]
         
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, knee, hip, knee]
         
-        # self.wheel_controller.publish(wheel_cmd)
+        self.wheel_controller.publish(wheel_cmd)
         self.legs_controller.publish(leg_cmd)
     
     def inverse_kinematics(self, x=0, y=0):
