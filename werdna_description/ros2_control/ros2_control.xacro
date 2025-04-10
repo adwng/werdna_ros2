@@ -34,7 +34,7 @@
             <param name="control_mode">position</param>
         </joint>
 
-        <joint name="left_knee_joint">
+        <!-- <joint name="left_knee_joint">
             <command_interface name="position"/>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
@@ -58,7 +58,7 @@
             <param name="can_id">5</param>
             <param name="position_offset">0</param>
             <param name="control_mode">position</param>
-        </joint>
+        </joint> -->
 
         <joint name="left_wheel_joint">
             <command_interface name="effort"/>
