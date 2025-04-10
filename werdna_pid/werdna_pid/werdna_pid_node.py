@@ -12,6 +12,7 @@ from scipy.spatial.transform import Rotation as R
 
 import os
 import time
+import yaml
 
 class ControlNode(Node):
 
@@ -33,22 +34,6 @@ class ControlNode(Node):
         self.legs_controller = self.create_publisher(Float64MultiArray, "/position_controller/commands", 10)
         self.get_logger().info("Publishers initialized")
 
-        # Load PyTorch model
-        self.model_file = "/home/andrew/werdna_ws/src/werdna_ros2/policy_velocity.pt"
-        self.get_logger().info(f"Loading TorchScript model from: {self.model_file}")
-        
-        try:
-            # Load TorchScript Model
-            start_time = time.time()
-            self.policy_model = torch.jit.load(self.model_file, map_location="cpu")
-            self.policy_model.eval()
-            load_time = time.time() - start_time
-            self.get_logger().info(f"Model successfully loaded in {load_time:.2f} seconds!")
-            
-        except Exception as e:
-            self.get_logger().error(f"Failed to load model: {e}")
-            self.policy_model = None
-
         self.target_joints = ["left_hip_motor_joint", "right_hip_motor_joint", "left_knee_joint", "right_knee_joint", "left_wheel_joint", "right_wheel_joint"]
         self.get_logger().info(f"Target joints configured: {self.target_joints}")
 
@@ -69,10 +54,9 @@ class ControlNode(Node):
 
         # Parameters
         self.wheel_joint_torque_limit = 2.0
-        self.wheel_joint_damping = 0.5
+        self.wheel_joint_damping = 0.1
         
         # Safety parameters
-        self.pitch = 0.0
 
         self.pitch_threshold = 0.7  
         self.safety_triggered = False
@@ -83,35 +67,77 @@ class ControlNode(Node):
         
         self.get_logger().info("Werdna Control Node initialization complete!")
 
-        timer_period = 0.02 # every 0.02 seconds //50Hz
+        # PID Controller parameters
+        self.balance_kp = 0
+        self.balance_kd = 0
+        self.steer_kp = 0.0
+        self.steer_kd = 0.0
+        self.pitch_offset = 0.0
+
+        # Internal PID state
+        self.pitch = 0.0
+        self.yaw = 0.0
+        self.roll = 0.0
+        self.pitch_vel = 0.0
+        self.yaw_vel = 0.0
+
+        config_file = "/home/andrew/werdna_ws/src/werdna_ros2/pid.yaml"
+
+        self.load_config(config_file)
+
+        timer_period = 0.01 # every 0.02 seconds //50Hz
         self.runtime = self.create_timer(timer_period, self.runtime_callback)
     
+    def load_config(self, config_file):
+        with open(config_file, 'r') as f:
+            config = yaml.safe_load(f)
+
+        # PID Controller parameters
+        self.balance_kp = config["balance_kp"]
+        self.balance_kd = config["balance_kd"]
+        self.steer_kp = config["steer_kp"]
+        self.steer_kd = config["steer_kd"]
+        self.pitch_offset = config["offset"]
+    
     def runtime_callback(self):
-        if self.current_state:
-            if self.policy_model is None:
-                self.get_logger().error("Cannot execute command: Model not loaded correctly")
-                return
-                
-            # action = None
-            obs = self.get_obs()
-            obs_tensor = torch.tensor(obs).unsqueeze(0)
-            
-            # Measure inference time
-            start_time = time.time()
-            with torch.no_grad():
-                action = self.policy_model(obs_tensor).numpy().flatten()
-            inference_time = time.time() - start_time
-            
-            # Log inference time occasionally
-            if hasattr(self, 'last_inference_log_time') and time.time() - self.last_inference_log_time < 1.0:
-                pass  # Skip logging if less than 5 seconds has passed
-            else:
-                self.last_inference_log_time = time.time()
-                self.get_logger().info(
+        if not self.current_state:
+            self.step(np.array([0.0, 0.0]))
+            return
+
+        if self.safety_triggered:
+            # self.get_logger().warn("Safety stop active: Robot pitch exceeds threshold. Sending zero action.")
+            # Send the robot to a safe position with wheels stopped
+            hip, knee = self.inverse_kinematics(0.0,0.01)  # Ensure some minimum height for stability
+            leg_cmd = Float64MultiArray()
+            leg_cmd.data = [float(hip), float(knee), float(hip), float(knee)]
+            self.legs_controller.publish(leg_cmd)
+            wheel_cmd = Float64MultiArray()
+            wheel_cmd.data = [0.0, 0.0]
+            self.wheel_controller.publish(wheel_cmd)
+            return
+
+        # --- BALANCING PID ---
+        pitch_error = ((self.desired_linear_x/10) + self.pitch_offset) - self.pitch
+        pitch_rate_error = 0.0 - self.pitch_vel
+        balance_output = self.balance_kp * pitch_error + self.balance_kd * pitch_rate_error
+
+        # --- STEERING PID ---
+        yaw_error = (self.desired_angular_z/10) - self.yaw
+        yaw_rate_error = 0.0- self.yaw_vel
+        steer_output = self.steer_kp * yaw_error + self.steer_kd * yaw_rate_error
+
+        # Combine both PIDs into wheel commands
+        # left_wheel_vel = balance_output - steer_output
+        # right_wheel_vel = balance_output + steer_output
+        left_wheel_vel = balance_output 
+        right_wheel_vel = balance_output 
+
+        action = np.array([left_wheel_vel, right_wheel_vel])
+        self.step(action)
+
+        self.get_logger().info(
                     "\n========== POLICY INFERENCE ==========\n"
-                    f"Inference time: {inference_time*1000:.2f} ms\n"
                     f"Actions: {action}\n"
-                    f"Velocity Desired: {self.velocity_des}\n"
                     f"Observations:\n"
                     f"  - Angular Velocity   : {self.angular_velocity}\n"
                     f"  - Projected Gravity  : {self.projected_gravity}\n"
@@ -123,49 +149,19 @@ class ControlNode(Node):
                     f"  - Previous Actions   : {self.previous_action}\n"
                     "======================================"
                 )
-            self.step(action)
-        else:
-            self.step(np.array([0.0,0.0]))
 
     def step(self, action):
-        # Check if safety stop is triggered due to excessive pitch
-        if self.safety_triggered:
-            # self.get_logger().warn("Safety stop active: Robot pitch exceeds threshold. Sending zero action.")
-            # Send the robot to a safe position with wheels stopped
-            hip, knee = self.inverse_kinematics(0.0,0.01)  # Ensure some minimum height for stability
-            leg_cmd = Float64MultiArray()
-            leg_cmd.data = [float(hip), float(knee), float(hip), float(knee)]
-            self.legs_controller.publish(leg_cmd)
-            # wheel_cmd = Float64MultiArray()
-            # wheel_cmd.data = [0.0, 0.0]
-            # self.wheel_controller.publish(wheel_cmd)
-            
-            # Update previous action to zeros
-            self.previous_action = np.zeros(2)
-            return
         
         # velocity_des = np.zeros(2)
-        exec_actions = np.clip(action, -100.0, 100.0)
+        exec_actions = np.clip(action, -0.5, 0.5)
 
-        # current wheel velocities
-        joint_vel = np.array([self.joint_velocities["left_wheel_joint"], self.joint_velocities["right_wheel_joint"]])
-
-        for i in range(len(joint_vel)):
-            action_min = joint_vel[i] - self.wheel_joint_torque_limit/self.wheel_joint_damping
-            action_max = joint_vel[i] + self.wheel_joint_torque_limit/self.wheel_joint_damping
-            self.previous_action[i] = exec_actions[i]
-            exec_actions[i] = max(action_min/self.wheel_joint_damping, min(action_max / self.wheel_joint_damping, exec_actions[i]))
-            self.velocity_des[i] = exec_actions[i] * self.wheel_joint_damping
-
-        hip, knee = self.inverse_kinematics(0, self.height)
-
-        # self.get_logger().info(f"Actions (0): {velocity_des[0]:.3f}, Actions (1): {velocity_des[1]:.3f}, Height: {self.height:.3f}")
+        hip, knee = self.inverse_kinematics(0, 0.05)
 
         wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        wheel_cmd.data = [float(self.velocity_des[0] * 1.0), float(self.velocity_des[1] * 1.0)]
+        wheel_cmd.data = [float(exec_actions[0] * 1.0), float(exec_actions[1] * 1.0)]
         
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, knee, hip, knee]
@@ -248,6 +244,10 @@ class ControlNode(Node):
             self.safety_triggered = False
             self.get_logger().info(f"Robot back within safe pitch range ({np.degrees(self.pitch):.1f}°). Movement enabled.")
 
+        self.pitch_vel = self.angular_velocity[1]  # y-axis angular velocity
+        self.yaw_vel = self.angular_velocity[2]    # z-axis angular velocity
+
+
     def joint_callback(self, msg):
         # The order in which joint_states comes in
         received_order = ["left_hip_motor_joint", "left_knee_joint", "left_wheel_joint", 
@@ -270,7 +270,7 @@ class ControlNode(Node):
             self.projected_gravity,
             np.array([self.desired_linear_x, self.desired_angular_z]),  # Desired commands
             np.array([self.joint_positions[joint] for joint in self.target_joints[:4]]),
-            np.array([self.joint_velocities[j] for j in self.target_joints]),
+            np.array([self.joint_velocities[j] for j in self.target_joints]) * 0.5,
             self.previous_action,  # Previous actions
         ]).astype(np.float32)
         return obs

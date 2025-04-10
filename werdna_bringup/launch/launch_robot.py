@@ -27,15 +27,15 @@ def generate_launch_description():
     ros2_control = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(ros2_control_launch_file)
     )
-    
-    # agent_node = Node(
-    #     package=agent_prefix,
-    #     name="werdna_agent",
-    #     executable="werdna_agent_node",
+
+
+    # agent_node = ExecuteProcess(
+    #     cmd=["ros2", "run", "werdna_agent", "werdna_agent_node"],
+    #     output="screen",
     # )
 
     agent_node = ExecuteProcess(
-        cmd=["ros2", "run", "werdna_agent", "werdna_agent_node"],
+        cmd=["ros2", "run", "werdna_pid", "werdna_pid_node"],
         output="screen",
     )
     

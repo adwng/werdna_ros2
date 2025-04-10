@@ -40,7 +40,7 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 |***Watchdog Timer***|Increase the watchdog timer for each servo to at least 0.5s to avoid mode 11 timeout bug|
 
 ```
-export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/pi3hat_hardware_interface/fastrtps_profile_no_shmem.xml
+export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/werdna_ros2/pi3hat_hardware_interface/fastrtps_profile_no_shmem.xml
 sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup launch_robot.py
 ```
 

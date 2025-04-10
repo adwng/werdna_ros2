@@ -394,9 +394,9 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
                     e_des = v.torque;
                 }
                 else{
-                    p_des = v.position;
-                    v_des = v.velocity;
-                    e_des = v.torque;
+                    p_des = -v.position;
+                    v_des = -v.velocity;
+                    e_des = -v.torque;
                 }
 
                 hw_state_positions_[i] = p_des;

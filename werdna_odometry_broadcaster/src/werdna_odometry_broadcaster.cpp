@@ -55,12 +55,12 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
   const rclcpp::Time & time, const rclcpp::Duration & period)
 {
 
-  double right_hip_pos, right_hip_vel;
-  double right_knee_pos, right_knee_vel;
-  double left_hip_pos, left_hip_vel;
-  double left_knee_pos, left_knee_vel;
-  double left_wheel_pos, left_wheel_vel;
-  double right_wheel_pos, right_wheel_vel;
+  double right_hip_pos, right_hip_vel, right_hip_force;
+  double right_knee_pos, right_knee_vel, right_knee_force;
+  double left_hip_pos, left_hip_vel, left_hip_force;
+  double left_knee_pos, left_knee_vel, left_knee_force;
+  double left_wheel_pos, left_wheel_vel, left_wheel_force;
+  double right_wheel_pos, right_wheel_vel, right_wheel_force;
   double orientation_w, orientation_x, orientation_y, orientation_z;
   double imu_yaw_vel;
 
@@ -69,17 +69,24 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
     //read joint states from hardware interfaces
     left_hip_pos = state_interfaces_map_.at(params_.left_hip_name).at("position").get().get_value();
     left_hip_vel = state_interfaces_map_.at(params_.left_hip_name).at("velocity").get().get_value();
+    // left_hip_force = state_interfaces_map_.at(params_.left_hip_name).at("effort").get().get_value();
     left_knee_pos = state_interfaces_map_.at(params_.left_knee_name).at("position").get().get_value();
     left_knee_vel = state_interfaces_map_.at(params_.left_knee_name).at("velocity").get().get_value();
+    // left_knee_force = state_interfaces_map_.at(params_.left_knee_name).at("effort").get().get_value();
     left_wheel_pos = state_interfaces_map_.at(params_.left_wheel_name).at("position").get().get_value();
     left_wheel_vel = state_interfaces_map_.at(params_.left_wheel_name).at("velocity").get().get_value();
+    // left_wheel_force = state_interfaces_map_.at(params_.left_wheel_name).at("effort").get().get_value();
 
     right_hip_pos = state_interfaces_map_.at(params_.right_hip_name).at("position").get().get_value();
     right_hip_vel = state_interfaces_map_.at(params_.right_hip_name).at("velocity").get().get_value();
+    // right_hip_force = state_interfaces_map_.at(params_.right_hip_name).at("effort").get().get_value();
     right_knee_pos = state_interfaces_map_.at(params_.right_knee_name).at("position").get().get_value();
     right_knee_vel = state_interfaces_map_.at(params_.right_knee_name).at("velocity").get().get_value();
+    // right_knee_force = state_interfaces_map_.at(params_.right_knee_name).at("effort").get().get_value();
+    
     right_wheel_pos = state_interfaces_map_.at(params_.right_wheel_name).at("position").get().get_value();
     right_wheel_vel = state_interfaces_map_.at(params_.right_wheel_name).at("velocity").get().get_value();
+    // right_wheel_force = state_interfaces_map_.at(params_.right_wheel_name).at("effort").get().get_value();
 
     //IMU States
     // read IMU states from hardware interface
@@ -223,22 +230,28 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
         joint_state_message.header.stamp = time;
 
         joint_state_message.position[0] = state_interfaces_map_.at(params_.left_hip_name).at("position").get().get_value();
-        joint_state_message.velocity[0] = state_interfaces_map_.at(params_.left_hip_name). at("velocity").get().get_value();
+        joint_state_message.velocity[0] = state_interfaces_map_.at(params_.left_hip_name).at("velocity").get().get_value();
+        // joint_state_message.effort[0] = state_interfaces_map_.at(params_.left_hip_name).at("effort").get().get_value();
 
         joint_state_message.position[1] = state_interfaces_map_.at(params_.left_knee_name).at("position").get().get_value();
-        joint_state_message.velocity[1] = state_interfaces_map_.at(params_.left_knee_name). at("velocity").get().get_value();
+        joint_state_message.velocity[1] = state_interfaces_map_.at(params_.left_knee_name).at("velocity").get().get_value();
+        // joint_state_message.effort[1] = state_interfaces_map_.at(params_.left_knee_name).at("effort").get().get_value();
 
         joint_state_message.position[2] = state_interfaces_map_.at(params_.left_wheel_name).at("position").get().get_value();
-        joint_state_message.velocity[2] = state_interfaces_map_.at(params_.left_wheel_name). at("velocity").get().get_value();
+        joint_state_message.velocity[2] = state_interfaces_map_.at(params_.left_wheel_name).at("velocity").get().get_value();
+        // joint_state_message.effort[2] = state_interfaces_map_.at(params_.left_wheel_name).at("effort").get().get_value();
 
         joint_state_message.position[3] = state_interfaces_map_.at(params_.right_hip_name).at("position").get().get_value();
-        joint_state_message.velocity[3] = state_interfaces_map_.at(params_.right_hip_name). at("velocity").get().get_value();
+        joint_state_message.velocity[3] = state_interfaces_map_.at(params_.right_hip_name).at("velocity").get().get_value();
+        // joint_state_message.effort[3] = state_interfaces_map_.at(params_.right_hip_name).at("effort").get().get_value();
 
         joint_state_message.position[4] = state_interfaces_map_.at(params_.right_knee_name).at("position").get().get_value();
-        joint_state_message.velocity[4] = state_interfaces_map_.at(params_.right_knee_name). at("velocity").get().get_value();
+        joint_state_message.velocity[4] = state_interfaces_map_.at(params_.right_knee_name).at("velocity").get().get_value();
+        // joint_state_message.effort[4] = state_interfaces_map_.at(params_.right_knee_name).at("effort").get().get_value();
 
         joint_state_message.position[5] = state_interfaces_map_.at(params_.right_wheel_name).at("position").get().get_value();
-        joint_state_message.velocity[5] = state_interfaces_map_.at(params_.right_wheel_name). at("velocity").get().get_value();
+        joint_state_message.velocity[5] = state_interfaces_map_.at(params_.right_wheel_name).at("velocity").get().get_value();
+        // joint_state_message.effort[5] = state_interfaces_map_.at(params_.right_wheel_name).at("effort").get().get_value();
 
         realtime_joint_state_publisher_->unlockAndPublish();
       }
@@ -314,6 +327,7 @@ controller_interface::CallbackReturn WerdnaOdometryBroadcaster::on_configure(
   joint_state_message.name = {params_.left_hip_name, params_.left_knee_name, params_.left_wheel_name, params_.right_hip_name, params_.right_knee_name, params_.right_wheel_name};
   joint_state_message.position.resize(NUM_JOINTS);
   joint_state_message.velocity.resize(NUM_JOINTS);
+  joint_state_message.effort.resize(NUM_JOINTS);
 
   auto &imu_message = realtime_imu_publisher_->msg_;
   imu_message.header.frame_id = "base_link";
@@ -345,6 +359,7 @@ controller_interface::CallbackReturn WerdnaOdometryBroadcaster::on_activate(
   RCLCPP_DEBUG(get_node()->get_logger(), "Activation Successful");
   return controller_interface::CallbackReturn::SUCCESS;
 }
+
 
 controller_interface::CallbackReturn WerdnaOdometryBroadcaster::on_deactivate(
   const rclcpp_lifecycle::State &)
