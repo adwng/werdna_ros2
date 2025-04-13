@@ -109,7 +109,7 @@ class ControlNode(Node):
             # Send the robot to a safe position with wheels stopped
             hip, knee = self.inverse_kinematics(0.0,0.01)  # Ensure some minimum height for stability
             leg_cmd = Float64MultiArray()
-            leg_cmd.data = [float(hip), float(knee), float(hip), float(knee)]
+            leg_cmd.data = [float(hip), float(hip)]
             self.legs_controller.publish(leg_cmd)
             wheel_cmd = Float64MultiArray()
             wheel_cmd.data = [0.0, 0.0]
@@ -155,7 +155,7 @@ class ControlNode(Node):
         # velocity_des = np.zeros(2)
         exec_actions = np.clip(action, -0.5, 0.5)
 
-        hip, knee = self.inverse_kinematics(0, 0.05)
+        hip, knee = self.inverse_kinematics(0, 0.0)
 
         wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
@@ -164,7 +164,7 @@ class ControlNode(Node):
         wheel_cmd.data = [float(exec_actions[0] * 1.0), float(exec_actions[1] * 1.0)]
         
         # Remaining actions control the leg joints
-        leg_cmd.data = [hip, knee, hip, knee]
+        leg_cmd.data = [hip, hip]
         
         self.wheel_controller.publish(wheel_cmd)
         self.legs_controller.publish(leg_cmd)

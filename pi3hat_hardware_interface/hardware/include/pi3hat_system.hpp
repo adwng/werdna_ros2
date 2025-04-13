@@ -84,7 +84,8 @@ private:
     std::vector<mjbots::moteus::CanFdFrame> send_frames;
     std::vector<mjbots::moteus::CanFdFrame> receive_frames;
 
-    //Callbaks
+    //Logging
+    int logging;
     
     // Actuator CAN config
     std::vector<int> hw_actuator_can_channels_;

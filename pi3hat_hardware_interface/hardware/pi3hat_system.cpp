@@ -106,6 +106,7 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
     toptions.mounting_deg.roll = std::stod(info_.hardware_parameters.at("imu_mounting_deg.roll"));
     toptions.mounting_deg.pitch = std::stod(info_.hardware_parameters.at("imu_mounting_deg.pitch"));
     toptions.mounting_deg.yaw = std::stod(info_.hardware_parameters.at("imu_mounting_deg.yaw"));
+    logging = std::stoi(info_.hardware_parameters.at("logging"));
 
     // Create the transport with the populated options
     transport = std::make_shared<Transport>(toptions);
@@ -402,18 +403,21 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
                 hw_state_positions_[i] = p_des;
                 hw_state_velocities_[i] = v_des;
                 hw_state_efforts_[i] = e_des;
+                if (logging == 1){
+                    if (control_modes_[i] == "position"){
                 
-                // RCLCPP_INFO(
-                //     rclcpp::get_logger("Pi3HatControlHardware"),
-                //     "Joint: %s, Command Type: %s, Mode: %2d, Command: %.3f, Position: %.3f, Velocity: %.3f, Fault:\r",
-                //     info_.joints[i].name.c_str(),
-                //     control_modes_[i].c_str(),
-                //     static_cast<int>(v.mode),
-                //     (control_modes_[i] == "position") ? hw_command_positions_[i] : hw_command_efforts_[i],
-                //     hw_state_positions_[i],
-                //     hw_state_velocities_[i],
-                //     v.fault
-                // );
+                        RCLCPP_INFO(
+                            rclcpp::get_logger("Pi3HatControlHardware"),
+                            "Joint: %s, Mode: %2d, Command: %.3f, Velocity: %.3f, Torque: %.3f, Temperature: %.3f",
+                            info_.joints[i].name.c_str(),
+                            static_cast<int>(v.mode),
+                            hw_state_positions_[i],
+                            hw_state_velocities_[i],
+                            hw_state_efforts_[i],
+                            v.temperature
+                        );
+                    }
+                }
             }
         }
     }

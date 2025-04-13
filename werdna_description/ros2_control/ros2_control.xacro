@@ -7,6 +7,7 @@
             <param name="imu_mounting_deg.roll">90</param>
             <param name="imu_mounting_deg.pitch">0</param>
             <param name="imu_mounting_deg.yaw">-90</param>
+            <param name="logging">0</param>
         </hardware>
 
         <joint name="left_hip_motor_joint">
@@ -17,7 +18,7 @@
 
             <param name="can_channel">1</param>
             <param name="can_id">1</param>
-            <param name="position_offset">-0.1</param>
+            <param name="position_offset">0.3</param>
             <param name="control_mode">position</param>
         </joint>
 
@@ -29,8 +30,8 @@
 
 
             <param name="can_channel">2</param>
-            <param name="can_id">4</param>
-            <param name="position_offset">-0.6</param>
+            <param name="can_id">5</param>
+            <param name="position_offset">0.3</param>
             <param name="control_mode">position</param>
         </joint>
 
@@ -61,35 +62,38 @@
         </joint> -->
 
         <joint name="left_wheel_joint">
-            <command_interface name="effort"/>
-            <!-- <command_interface name="velocity"/> -->
+            <command_interface name="velocity"/>            
+            <!-- <command_interface name="effort"/> -->
             <state_interface name="position"/>
             <state_interface name="velocity"/>
             <state_interface name="effort"/>
 
 
             <param name="can_channel">1</param>
-            <param name="can_id">3</param>
-            <param name="position_offset">0.0</param>
-            <!-- <param name="control_mode">velocity</param> -->
-            <param name="control_mode">effort</param>
-            
+            <param name="can_id">6</param>
+            <param name="position_offset">0</param>
+            <!-- <param name="control_mode">effort</param> -->
+            <param name="control_mode">velocity</param>
         </joint>
 
         <joint name="right_wheel_joint">
-            <command_interface name="effort"/>
-            <!-- <command_interface name="velocity"/> -->
+            <command_interface name="velocity"/>            
+            <!-- <command_interface name="effort"/> -->
             <state_interface name="position"/>
             <state_interface name="velocity"/>
             <state_interface name="effort"/>
 
 
             <param name="can_channel">2</param>
-            <param name="can_id">6</param>
-            <param name="position_offset">-0.0</param>
-            <param name="control_mode">effort</param>
-            <!-- <param name="control_mode">velocity</param> -->
+            <param name="can_id">3</param>
+            <param name="position_offset">0</param>
+            <!-- <param name="control_mode">effort</param> -->
+            <param name="control_mode">velocity</param>
         </joint>
+
+         
+
+       
 
     <sensor name="imu_sensor">
         <state_interface name="orientation.x"/>
