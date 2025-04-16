@@ -1,7 +1,30 @@
-balance_kp: 9
-balance_kd: 0.0
-steer_kp: 0.0
-steer_kd: 0.0
-drive_kp: 0.0
-drive_ki: 0.00
-offset: 0.18
+# Balance PID (inner loop for pitch control)
+balance_kp: 0.8 #Tune
+balance_kd: 0.2 #Tune
+balance_ki: 0.0
+balance_ilimit: 0.0
+balance_iratelimit: 0
+balance_kpkd_limit: 0.0
+balance_max_rate: 0.0
+
+# Velocity PID (outer loop for speed control)
+velocity_kp: 0.0 # Tune
+velocity_ki: 0.0 # Tune
+velocity_kd: 0.0
+velocity_ilimit: 0.0 # Tune 
+velocity_iratelimit: 0.0 # Tune
+velocity_kpkd_limit: 0.0
+velocity_max_rate: 0.0 # Tune
+
+# Steering PID (for angular control)
+steer_kp: 0.0 # Tune
+steer_kd: 0.0 # Tune
+steer_ki: 0.0
+steer_ilimit: 0.0
+steer_iratelimit: 0.0
+steer_kpkd_limit: 0.0
+steer_max_rate: 1.5
+
+# General settings
+offset: 0.08     # Pitch offset/trim
+accel_gain: 0.01  # Acceleration feedforward gain
