@@ -22,7 +22,7 @@ class ControlNode(Node):
 
         # Subscribers
         self.get_logger().info("Setting up subscribers...")
-        self.imu_subscriber = self.create_subscription(Imu, 'odometry_broadcaster/imu', self.imu_callback, 10)
+        self.imu_subscriber = self.create_subscription(Imu, 'imu/data', self.imu_callback, 10)
         self.joint_subscriber = self.create_subscription(JointState, '/joint_states', self.joint_callback, 10)
         self.command_subscriber = self.create_subscription(JoyCtrlCmds, '/werdna_control', self.command_callback, 10)
         self.get_logger().info("Subscribers initialized")
@@ -134,7 +134,7 @@ class ControlNode(Node):
             # Send the robot to a safe position with wheels stopped
             hip, knee = self.inverse_kinematics(0.0,0.01)  # Ensure some minimum height for stability
             leg_cmd = Float64MultiArray()
-            leg_cmd.data = [float(hip), float(knee), float(hip), float(knee)]
+            leg_cmd.data = [float(hip), float(hip)]
             self.legs_controller.publish(leg_cmd)
             # wheel_cmd = Float64MultiArray()
             # wheel_cmd.data = [0.0, 0.0]
@@ -168,7 +168,7 @@ class ControlNode(Node):
         wheel_cmd.data = [float(self.velocity_des[0] * 1.0), float(self.velocity_des[1] * 1.0)]
         
         # Remaining actions control the leg joints
-        leg_cmd.data = [hip, knee, hip, knee]
+        leg_cmd.data = [hip, hip]
         
         self.wheel_controller.publish(wheel_cmd)
         self.legs_controller.publish(leg_cmd)
@@ -213,32 +213,29 @@ class ControlNode(Node):
 
         self.angular_velocity = np.array([msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z])
 
-        rotation_matrix = R.from_quat(base_quat).as_matrix()
-
-        # Compute the projected gravity vector
-        self.projected_gravity = rotation_matrix.T @ gravity_vector
-
-        # # Compute yaw from projected gravity
-        projected_yaw = np.arctan2(self.projected_gravity[1], self.projected_gravity[0])  
-
-         # Initialize yaw offset on the first IMU message
-        if self.yaw_offset is None:
-            self.yaw_offset = projected_yaw  # Store first yaw reading as reference
-            self.get_logger().info(f"Yaw offset initialized: {np.degrees(self.yaw_offset):.2f}°")
-
-        # Ensure yaw_offset is valid before correction
-        if self.yaw_offset is not None:
-            yaw_corrected_gravity_x = np.cos(-self.yaw_offset) * self.projected_gravity[0] - np.sin(-self.yaw_offset) * self.projected_gravity[1]
-            yaw_corrected_gravity_y = np.sin(-self.yaw_offset) * self.projected_gravity[0] + np.cos(-self.yaw_offset) * self.projected_gravity[1]
-
-            self.projected_gravity[0] = yaw_corrected_gravity_x
-            self.projected_gravity[1] = yaw_corrected_gravity_y
-
-        # Extract roll and pitch from quaternion for safety checks
         euler_angles = R.from_quat(base_quat).as_euler('xyz')
         self.roll = euler_angles[0]
         self.pitch = euler_angles[1]
         self.yaw = euler_angles[2]
+
+        if self.yaw_offset is None:
+            self.yaw_offset = self.yaw
+            self.get_logger().info(f"Yaw Offset Initialized: {np.degrees(self.yaw_offset):.2f}")
+        else:
+            self.yaw -= self.yaw_offset
+
+        # Compute rotation matrix from base_quat
+        rotation_matrix = R.from_quat(base_quat).as_matrix()
+
+        # Project global gravity vector (0, 0, -1) into robot frame
+        projected_gravity = rotation_matrix.T @ gravity_vector  # robot sees gravity pointing this way
+
+        # Now rotate the projected gravity vector by -yaw_offset to align to initial yaw
+        if self.yaw_offset is not None:
+            yaw_correction = R.from_euler('z', -self.yaw_offset).as_matrix()
+            projected_gravity = yaw_correction @ projected_gravity
+
+        self.projected_gravity = projected_gravity
 
         # Safety check
         if abs(self.pitch) > self.pitch_threshold and not self.safety_triggered:

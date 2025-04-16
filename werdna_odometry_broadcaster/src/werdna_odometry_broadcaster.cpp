@@ -281,7 +281,7 @@ controller_interface::CallbackReturn WerdnaOdometryBroadcaster::on_configure(
 
   // Initialize the publishers
   odometry_publisher_ = get_node()->create_publisher<nav_msgs::msg::Odometry>(
-    "~/odom", rclcpp::SystemDefaultsQoS());
+    "/odom", rclcpp::SystemDefaultsQoS());
   realtime_odometry_publisher_ =
     std::make_shared<realtime_tools::RealtimePublisher<nav_msgs::msg::Odometry>>(
         odometry_publisher_);
@@ -293,13 +293,13 @@ controller_interface::CallbackReturn WerdnaOdometryBroadcaster::on_configure(
           joint_state_publisher_);
 
   imu_publisher_ = get_node()->create_publisher<sensor_msgs::msg::Imu>(
-      "~/imu", rclcpp::SystemDefaultsQoS());
+      "/imu/data", rclcpp::SystemDefaultsQoS());
   realtime_imu_publisher_ =
       std::make_shared<realtime_tools::RealtimePublisher<sensor_msgs::msg::Imu>>(
           imu_publisher_);
 
   base_link_transform_publisher_ = get_node()->create_publisher<tf2_msgs::msg::TFMessage>(
-      "~/tf", rclcpp::SystemDefaultsQoS());
+      "/tf", rclcpp::SystemDefaultsQoS());
   realtime_base_link_transform_publisher_ =
       std::make_shared<realtime_tools::RealtimePublisher<tf2_msgs::msg::TFMessage>>(
           base_link_transform_publisher_);

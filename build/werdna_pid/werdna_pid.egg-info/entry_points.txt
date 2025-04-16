@@ -1,0 +1,3 @@
+[console_scripts]
+werdna_pid_node = werdna_pid.werdna_pid_node:main
+

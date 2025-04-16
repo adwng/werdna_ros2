@@ -15,8 +15,6 @@ controller_manager:
     odometry_broadcaster:
       type: werdna_odometry_broadcaster/WerdnaOdometryBroadcaster
 
-    # TODO: ADD ODOMETRY PUBLISHER HERE
-
 position_controller:
   ros__parameters:
     joints:

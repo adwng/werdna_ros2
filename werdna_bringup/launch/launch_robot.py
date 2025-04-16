@@ -38,9 +38,15 @@ def generate_launch_description():
         cmd=["ros2", "run", "werdna_pid", "werdna_pid_node"],
         output="screen",
     )
+
+    rosboard = ExecuteProcess(
+        cmd=["ros2", "run", "rosboard", "rosboard_node"],
+        output="screen"
+    )
     
     return LaunchDescription([
         teleop,
         ros2_control,
         agent_node,
+        # rosboard,
     ])

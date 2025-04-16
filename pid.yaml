@@ -1,5 +1,7 @@
-balance_kp: 12
-balance_kd: 0.36
+balance_kp: 9
+balance_kd: 0.0
 steer_kp: 0.0
 steer_kd: 0.0
-offset: 0.15
+drive_kp: 0.0
+drive_ki: 0.00
+offset: 0.18
