@@ -16,7 +16,7 @@ using namespace std::chrono;
 auto control_command = werdna_msgs::msg::JoyCtrlCmds();
 steady_clock::time_point last_toggle_time_state = steady_clock::now();
 const int button_toggle_delay_ms = 3000;  // Toggle delay in milliseconds
-const double max_height = 0.148;         // Maximum height value
+const double max_height = 0.14;         // Maximum height value
 const double linear_scale = 1.0;         // Scale factor for linear velocity
 const double angular_scale = 1.0;        // Scale factor for angular velocity
 

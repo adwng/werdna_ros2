@@ -94,6 +94,7 @@ private:
     // Actuator parameters
     std::vector<std::string> control_modes_;
     std::vector<double> hw_actuator_position_offsets_;
+    std::vector<double> hw_actuator_axis_directions_; 
 
     // Actuator states
     std::vector<double> hw_state_positions_;

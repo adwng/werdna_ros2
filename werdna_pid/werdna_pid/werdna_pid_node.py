@@ -28,7 +28,11 @@ class PIDConfig:
 
 class PIDState:
     def __init__(self):
-        self.integral = 0.0
+        self.integral = 0.
+        # // When starting with desired rate limits in place, we by default
+        # // always accept the first desired command with no limiting (users
+        # // can of course override this value if they want to start from
+        # // some predetermined value).
         self.desired = float('nan')
         self.error = 0.0
         self.error_rate = 0.0
@@ -127,51 +131,57 @@ class ControlNode(Node):
         self.desired_angular_z = 0
 
         self.angular_velocity = np.array([0.0, 0.0, 0.0])
+        self.linear_accelerations = np.array([0.0, 0.0, 0.0])
         self.projected_gravity = np.array([0.0, 0.0, 0.0])
         self.joint_positions = {joint: 0.0 for joint in self.target_joints}
         self.joint_velocities = {joint: 0.0 for joint in self.target_joints}
         self.previous_action = np.zeros(2)  # 2 wheels
         self.velocity_des = np.zeros(2)
 
+        self.wheel_radius = 0.0855
+        self.wheel_circumference = np.pi * self.wheel_radius
         
         # Safety parameters
         self.pitch_threshold = 0.7  
         self.filtered_angular_velocity = np.zeros(3)
-        self.alpha = 0.0  # Tune between 0.1 and 0.3
-        self.velocity_integral = 0.0
-        self.velocity_integral_max = 0.5  # Anti-windup clamp value (adjust as needed)
-
         self.safety_triggered = False
         self.yaw_offset = None
         
         self.get_logger().info("Safety parameters configured:")
         self.get_logger().info(f"  - Pitch threshold: {self.pitch_threshold:.2f} radians ({np.degrees(self.pitch_threshold):.1f} degrees)")
         
-        self.get_logger().info("Werdna Control Node initialization complete!")
-
-        # PID Controller parameters
-        self.balance_kp = 0
-        self.balance_kd = 0
-        self.steer_kp = 0.0
-        self.steer_kd = 0.0
-        self.pitch_offset = 0.0
-
         # Internal PID state
         self.pitch = 0.0
         self.yaw = 0.0
         self.roll = 0.0
         self.pitch_vel = 0.0
         self.yaw_vel = 0.0
-
-        self.wheel_radius = 0.0855
-        self.wheel_circumference = 2 * np.pi * self.wheel_radius
-
+        
+        # Setup PID controllers
+        self.velocity_pid_config = PIDConfig()
+        self.velocity_pid_state = PIDState()
+        self.velocity_pid = PID(self.velocity_pid_config, self.velocity_pid_state)
+        
+        self.balance_pid_config = PIDConfig()
+        self.balance_pid_state = PIDState()
+        self.balance_pid = PID(self.balance_pid_config, self.balance_pid_state)
+        
+        self.steer_pid_config = PIDConfig()
+        self.steer_pid_state = PIDState()
+        self.steer_pid = PID(self.steer_pid_config, self.steer_pid_state)
+        
+        # Control loop rate (Hz)
+        self.control_rate = 100  # 100Hz or 0.01s period
+        self.alpha = pow(0.5, self.control_rate / 0.1) # Tune between 0.1 and 0.3
+        
+        # Load PID configurations
         config_file = "/home/andrew/werdna_ws/src/werdna_ros2/pid.yaml"
-
         self.load_config(config_file)
 
-        timer_period = 0.01 # every 0.02 seconds //50Hz
+        timer_period = 0.01  # 100Hz
         self.runtime = self.create_timer(timer_period, self.runtime_callback)
+        
+        self.get_logger().info("Werdna Control Node initialization complete!")
     
     def load_config(self, config_file):
         try:
@@ -181,49 +191,49 @@ class ControlNode(Node):
             # Load velocity PID configuration
             self.velocity_pid_config.kp = config.get("velocity_kp", 0.0)
             self.velocity_pid_config.ki = config.get("velocity_ki", 0.0)
-            self.velocity_pid_config.kd = config.get("velocity_kd", 0.0)
+            # self.velocity_pid_config.kd = config.get("velocity_kd", 0.0)
             self.velocity_pid_config.ilimit = config.get("velocity_ilimit", 0.5)
-            self.velocity_pid_config.iratelimit = config.get("velocity_iratelimit", 0.1)
-            self.velocity_pid_config.kpkd_limit = config.get("velocity_kpkd_limit", 0.15)
-            self.velocity_pid_config.max_desired_rate = config.get("velocity_max_rate", 1.0)
-            self.velocity_pid_config.sign = 1.0
+            # self.velocity_pid_config.iratelimit = config.get("velocity_iratelimit", 0.1)
+            # self.velocity_pid_config.kpkd_limit = config.get("velocity_kpkd_limit", 0.15)
+            # self.velocity_pid_config.max_desired_rate = config.get("velocity_max_rate", 1.0)
+            # self.velocity_pid_config.sign = 1.0
             
             # Load balance PID configuration
             self.balance_pid_config.kp = config.get("balance_kp", 0.0)
             self.balance_pid_config.ki = config.get("balance_ki", 0.0)
             self.balance_pid_config.kd = config.get("balance_kd", 0.0)
             self.balance_pid_config.ilimit = config.get("balance_ilimit", 0.0)
-            self.balance_pid_config.iratelimit = config.get("balance_iratelimit", -1.0)
-            self.balance_pid_config.kpkd_limit = config.get("balance_kpkd_limit", 1.0)
-            self.balance_pid_config.max_desired_rate = config.get("balance_max_rate", 0.0)
-            self.balance_pid_config.sign = 1.0
+            # self.balance_pid_config.iratelimit = config.get("balance_iratelimit", -1.0)
+            # self.balance_pid_config.kpkd_limit = config.get("balance_kpkd_limit", 1.0)
+            # self.balance_pid_config.max_desired_rate = config.get("balance_max_rate", 0.0)
+            # self.balance_pid_config.sign = 1.0
             
             # Load steering PID configuration
             self.steer_pid_config.kp = config.get("steer_kp", 0.0)
-            self.steer_pid_config.ki = config.get("steer_ki", 0.0)
+            # self.steer_pid_config.ki = config.get("steer_ki", 0.0)
             self.steer_pid_config.kd = config.get("steer_kd", 0.0)
             self.steer_pid_config.ilimit = config.get("steer_ilimit", 0.0)
-            self.steer_pid_config.iratelimit = config.get("steer_iratelimit", -1.0)
-            self.steer_pid_config.kpkd_limit = config.get("steer_kpkd_limit", 0.5)
-            self.steer_pid_config.max_desired_rate = config.get("steer_max_rate", 0.0)
-            self.steer_pid_config.sign = 1.0
+            # self.steer_pid_config.iratelimit = config.get("steer_iratelimit", -1.0)
+            # self.steer_pid_config.kpkd_limit = config.get("steer_kpkd_limit", 0.5)
+            # self.steer_pid_config.max_desired_rate = config.get("steer_max_rate", 0.0)
+            # self.steer_pid_config.sign = 1.0
             
             # Additional parameters
             self.pitch_offset = config.get("offset", 0.0)
-            self.accel_gain = config.get("accel_gain", 0.01)
+            self.accel_gain = config.get("accel_gain", 0.0)
             
             self.get_logger().info(f"PID configuration loaded from {config_file}")
             
         except Exception as e:
             self.get_logger().error(f"Failed to load PID configuration: {str(e)}")
             # Set default values
-            self.balance_pid_config.kp = 0.5
-            self.balance_pid_config.kd = 0.1
-            self.steer_pid_config.kp = 0.2
-            self.steer_pid_config.kd = 0.05
-            self.velocity_pid_config.kp = 0.3
-            self.velocity_pid_config.ki = 0.05
-            self.pitch_offset = 0.0
+            # self.balance_pid_config.kp = 0.5
+            # self.balance_pid_config.kd = 0.1
+            # self.steer_pid_config.kp = 0.2
+            # self.steer_pid_config.kd = 0.05
+            # self.velocity_pid_config.kp = 0.3
+            # self.velocity_pid_config.ki = 0.05
+            # self.pitch_offset = 0.0
     
     def runtime_callback(self):
         if not self.current_state:
@@ -246,11 +256,8 @@ class ControlNode(Node):
         wheel_radius = 0.0855  # Adjust as needed for your robot
         left_vel = self.joint_velocities["left_wheel_joint"] * wheel_radius
         right_vel = self.joint_velocities["right_wheel_joint"] * wheel_radius
-        avg_velocity = (0.5 * (left_vel + right_vel)) * self.wheel_circumference
+        avg_velocity = (0.5 * (left_vel + right_vel)) 
 
-        # Compute feedforward pitch contribution from acceleration
-        pitch_ff = self.accel_gain * self.linear_accelerations[0]
-        
         # Apply velocity PID controller
 
         target_pitch = self.velocity_pid.apply(
@@ -259,10 +266,10 @@ class ControlNode(Node):
             0.0,
             0.0, 
             self.control_rate  
-        ) + pitch_ff
+        ) 
         
         # Clamp the target pitch to reasonable values
-        target_pitch = np.clip(target_pitch, -0.15, 0.15)
+        target_pitch = np.clip(target_pitch, -0.08, 0.08)
 
  
         balance_output = self.balance_pid.apply(
@@ -319,7 +326,10 @@ class ControlNode(Node):
         # velocity_des = np.zeros(2)
         exec_actions = np.clip(action, -1.0, 1.0)
 
-        hip, knee = self.inverse_kinematics(0, 0.0)
+        hip, knee = self.inverse_kinematics(0, self.height)
+
+        if (hip >= 0.32):
+            hip = 0.32
 
         wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
@@ -328,7 +338,7 @@ class ControlNode(Node):
         wheel_cmd.data = [float(exec_actions[0] * 1.0), float(exec_actions[1] * 1.0)]
         
         # Remaining actions control the leg joints
-        leg_cmd.data = [hip, hip]
+        leg_cmd.data = [float(hip), float(hip)]
         
         self.wheel_controller.publish(wheel_cmd)
         self.legs_controller.publish(leg_cmd)
@@ -384,17 +394,15 @@ class ControlNode(Node):
         ])
 
         # Apply low-pass filter
-        self.filtered_angular_velocity = (
-            self.alpha * raw_angular_velocity + (1 - self.alpha) * self.filtered_angular_velocity
-        )
+        self.filtered_angular_velocity = raw_angular_velocity
 
         self.angular_velocity = self.filtered_angular_velocity.copy()
 
         # Extract roll and pitch from quaternion for safety checks
         euler_angles = R.from_quat(base_quat).as_euler('xyz')
-        self.roll = euler_angles[0]
-        self.pitch = euler_angles[1]
-        self.yaw = euler_angles[2]
+        self.roll = euler_angles[0] 
+        self.pitch = euler_angles[1] 
+        self.yaw = euler_angles[2] 
 
         if self.yaw_offset is None:
             self.yaw_offset = self.yaw
@@ -437,8 +445,8 @@ class ControlNode(Node):
         
         # Update current values
         self.height = msg.height
-        self.desired_linear_x = msg.linear.x
-        self.desired_angular_z = msg.angular.z
+        self.desired_linear_x = msg.linear.x * 0.05
+        self.desired_angular_z = msg.angular.z * -0.5
         self.prev_state = msg.state
         
         # Log commands when they change
@@ -449,7 +457,7 @@ class ControlNode(Node):
 
             self.current_state = msg.state
             
-            self.get_logger().info(f"Received command - Height: {self.height:.2f}, Linear X: {self.desired_linear_x:.2f}, Angular Z: {self.desired_angular_z:.2f}, State: {msg.state}")
+            # self.get_logger().info(f"Received command - Height: {self.height:.2f}, Linear X: {self.desired_linear_x:.2f}, Angular Z: {self.desired_angular_z:.2f}, State: {msg.state}")
         
     
 def main(args=None):

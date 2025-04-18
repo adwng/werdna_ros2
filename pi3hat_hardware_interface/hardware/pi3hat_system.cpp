@@ -40,6 +40,7 @@ hardware_interface::CallbackReturn Pi3HatControlHardware::on_init(const hardware
         hw_actuator_can_channels_.push_back(std::stoi(joint.parameters.at("can_channel")));
         hw_actuator_can_ids_.push_back(std::stoi(joint.parameters.at("can_id")));
         hw_actuator_position_offsets_.push_back(std::stod(joint.parameters.at("position_offset")));
+        hw_actuator_axis_directions_.push_back(std::stoi(joint.parameters.at("axis_direction")));
         control_modes_.push_back(joint.parameters.at("control_mode"));
     }
 
@@ -338,7 +339,7 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
 
         if (control_modes_[i] == "position")  // Position control
         {
-            computed_cmd = ((hw_command_positions_[i] / (2 * M_PI)) * 9.0) + hw_actuator_position_offsets_[i];
+            computed_cmd = (((hw_command_positions_[i] / (2 * M_PI)) * 9.0) + hw_actuator_position_offsets_[i]) * hw_actuator_axis_directions_[i];
             cmd.position = computed_cmd; 
             cmd.velocity = 0.0;
             cmd.velocity_limit = 2.0;
@@ -348,13 +349,13 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
         {
             cmd.kp_scale = 0.0f;
             cmd.kd_scale = 0.0f;
-            cmd.feedforward_torque = hw_command_efforts_[i];
+            cmd.feedforward_torque = hw_command_efforts_[i] * hw_actuator_axis_directions_[i];
         }
         else if (control_modes_[i] == "velocity") 
         {
             cmd.kp_scale = 0.0f;
             cmd.kd_scale = 1.0f;
-            cmd.velocity = hw_command_velocities_[i];
+            cmd.velocity = hw_command_velocities_[i] * hw_actuator_axis_directions_[i];
         }
 
         send_frames.push_back(controllers[i]->MakePosition(cmd));
@@ -390,21 +391,21 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
 
                 if (control_modes_[i] == "position")
                 {
-                    p_des = ((v.position - hw_actuator_position_offsets_[i])/9.0) * 2 * M_PI;
-                    v_des = (v.velocity)/9;
-                    e_des = v.torque;
+                    p_des = ((v.position - hw_actuator_position_offsets_[i])/9.0) * 2 * M_PI * hw_actuator_axis_directions_[i];
+                    v_des = (v.velocity)/9 * hw_actuator_axis_directions_[i];
+                    e_des = v.torque * hw_actuator_axis_directions_[i];
                 }
                 else{
-                    p_des = -v.position;
-                    v_des = -v.velocity;
-                    e_des = -v.torque;
+                    p_des = -v.position * hw_actuator_axis_directions_[i];
+                    v_des = -v.velocity * hw_actuator_axis_directions_[i];
+                    e_des = -v.torque * hw_actuator_axis_directions_[i];
                 }
 
                 hw_state_positions_[i] = p_des;
                 hw_state_velocities_[i] = v_des;
                 hw_state_efforts_[i] = e_des;
                 if (logging == 1){
-                    if (control_modes_[i] == "position"){
+
                 
                         RCLCPP_INFO(
                             rclcpp::get_logger("Pi3HatControlHardware"),
@@ -416,7 +417,7 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
                             hw_state_efforts_[i],
                             v.temperature
                         );
-                    }
+                    
                 }
             }
         }
