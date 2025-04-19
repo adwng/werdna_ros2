@@ -48,5 +48,5 @@ def generate_launch_description():
         teleop,
         ros2_control,
         agent_node,
-        # rosboard,
+        rosboard,
     ])
