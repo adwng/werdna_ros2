@@ -11,6 +11,8 @@ import torch
 from scipy.spatial.transform import Rotation as R
 
 import os
+from datetime import datetime
+import pandas as pd
 import time
 
 class ControlNode(Node):
@@ -60,12 +62,13 @@ class ControlNode(Node):
         self.desired_linear_x = 0
         self.desired_angular_z = 0
 
+        # State Spaces
         self.angular_velocity = np.array([0.0, 0.0, 0.0])
+        self.velocity_des = np.zeros(2)
         self.projected_gravity = np.array([0.0, 0.0, 0.0])
         self.joint_positions = {joint: 0.0 for joint in self.target_joints}
         self.joint_velocities = {joint: 0.0 for joint in self.target_joints}
         self.previous_action = np.zeros(2)  # 2 wheels
-        self.velocity_des = np.zeros(2)
 
         # Parameters
         self.wheel_joint_torque_limit = 2.0
@@ -73,7 +76,6 @@ class ControlNode(Node):
         
         # Safety parameters
         self.pitch = 0.0
-
         self.pitch_threshold = 0.7  
         self.safety_triggered = False
         self.yaw_offset = None
@@ -85,9 +87,63 @@ class ControlNode(Node):
 
         timer_period = 0.02 # every 0.02 seconds //50Hz
         self.runtime = self.create_timer(timer_period, self.runtime_callback)
+
+        self.get_logger().info("Werdna Control Node initialization complete!")
+
+        # Add data logging for Excel
+        self.data_log = []
+        self.log_columns = [
+            'timestamp', 
+            'pitch', 
+            'pitch_vel',
+            'yaw',
+            'yaw_vel', 
+            'left_wheel_torque', 
+            'right_wheel_torque',
+            'left_wheel_velocity', 
+            'right_wheel_velocity',
+            'avg_velocity',
+            'desired_linear_x', 
+            'desired_angular_z',
+            'height'
+        ]
+        
+        # Configure logging frequency (e.g., log every 5 control cycles)
+        self.logdata = False
+        self.log_frequency = 5
+        self.log_counter = 0
+        
+        # Prepare for Excel logging
+        self.log_directory = os.path.expanduser("~/werdna_logs")
+        if not os.path.exists(self.log_directory):
+            os.makedirs(self.log_directory)
+            self.get_logger().info(f"Created log directory: {self.log_directory}")
+        
+        # Auto-save every N data points to prevent data loss
+        self.auto_save_threshold = 500
+        
+        # Add shutdown hook for saving data
+        self.get_logger().info("Data logging initialized")
+        
+        # Add a timer to periodically save data (every 60 seconds)
+        self.save_timer = self.create_timer(15.0, self.save_data_timer_callback)
     
     def runtime_callback(self):
         if self.current_state:
+            # Check if safety stop is triggered due to excessive pitch
+            if self.safety_triggered:
+                hip, knee = self.inverse_kinematics(0.0,0.01) 
+                leg_cmd = Float64MultiArray()
+                leg_cmd.data = [float(hip), float(hip)]
+                self.legs_controller.publish(leg_cmd)
+
+                wheel_cmd = Float64MultiArray()
+                wheel_cmd.data = [0.0, 0.0]
+                self.wheel_controller.publish(wheel_cmd)
+                
+                self.previous_action = np.zeros(2)
+                return
+
             if self.policy_model is None:
                 self.get_logger().error("Cannot execute command: Model not loaded correctly")
                 return
@@ -95,6 +151,11 @@ class ControlNode(Node):
             # action = None
             obs = self.get_obs()
             obs_tensor = torch.tensor(obs).unsqueeze(0)
+
+            wheel_radius = 0.0855  # Adjust as needed for your robot
+            left_vel = self.joint_velocities["left_wheel_joint"] * wheel_radius
+            right_vel = self.joint_velocities["right_wheel_joint"] * wheel_radius
+            avg_velocity = (0.5 * (left_vel + right_vel)) 
             
             # Measure inference time
             start_time = time.time()
@@ -102,47 +163,54 @@ class ControlNode(Node):
                 action = self.policy_model(obs_tensor).numpy().flatten()
             inference_time = time.time() - start_time
             
-            # Log inference time occasionally
-            if hasattr(self, 'last_inference_log_time') and time.time() - self.last_inference_log_time < 1.0:
-                pass  # Skip logging if less than 5 seconds has passed
-            else:
-                self.last_inference_log_time = time.time()
-                self.get_logger().info(
-                    "\n========== POLICY INFERENCE ==========\n"
-                    f"Inference time: {inference_time*1000:.2f} ms\n"
-                    f"Actions: {action}\n"
-                    f"Velocity Desired: {self.velocity_des}\n"
-                    f"Observations:\n"
-                    f"  - Angular Velocity   : {self.angular_velocity}\n"
-                    f"  - Projected Gravity  : {self.projected_gravity}\n"
-                    f"  - Roll Pitch Yaw     : {self.roll:.2f}, {self.pitch:.2f}, {self.yaw:.2f} \n"
-                    f"  - Desired Linear X   : {self.desired_linear_x:.2f}\n"
-                    f"  - Desired Angular Z  : {self.desired_angular_z:.2f}\n"
-                    f"  - Joint Positions    : {[round(self.joint_positions[j], 3) for j in self.target_joints[:4]]}\n"
-                    f"  - Joint Velocities   : {[round(self.joint_velocities[j], 3) for j in self.target_joints]}\n"
-                    f"  - Previous Actions   : {self.previous_action}\n"
-                    "======================================"
-                )
+            if self.logdata:
+                # Log data for Excel export
+                self.log_counter += 1
+                if self.log_counter >= self.log_frequency:
+                    self.log_counter = 0
+                    self.log_data_point(
+                        self.pitch,
+                        self.pitch_vel,
+                        self.yaw,
+                        self.yaw_vel,
+                        self.previous_action[0],
+                        self.previous_action[1],
+                        left_vel,
+                        right_vel,
+                        avg_velocity,
+                        self.desired_linear_x,
+                        self.desired_angular_z,
+                        self.height
+                    )
+           
             self.step(action)
         else:
             self.step(np.array([0.0,0.0]))
+            return
+        
+         # Log inference time occasionally
+        if hasattr(self, 'last_inference_log_time') and time.time() - self.last_inference_log_time < 1.0:
+            pass  # Skip logging if less than 5 seconds has passed
+        else:
+            self.last_inference_log_time = time.time()
+            self.get_logger().info(
+                "\n========== POLICY INFERENCE ==========\n"
+
+                f"Actions: {action}\n"
+                f"Velocity Desired: {self.velocity_des}\n"
+                f"Observations:\n"
+                f"  - Angular Velocity   : {self.angular_velocity}\n"
+                f"  - Projected Gravity  : {self.projected_gravity}\n"
+                f"  - Roll Pitch Yaw     : {self.roll:.2f}, {self.pitch:.2f}, {self.yaw:.2f} \n"
+                f"  - Desired Linear X   : {self.desired_linear_x:.2f}\n"
+                f"  - Desired Angular Z  : {self.desired_angular_z:.2f}\n"
+                f"  - Joint Positions    : {[round(self.joint_positions[j], 3) for j in self.target_joints[:4]]}\n"
+                f"  - Joint Velocities   : {[round(self.joint_velocities[j], 3) for j in self.target_joints]}\n"
+                f"  - Previous Actions   : {self.previous_action}\n"
+                "======================================"
+            )
 
     def step(self, action):
-        # Check if safety stop is triggered due to excessive pitch
-        if self.safety_triggered:
-            # self.get_logger().warn("Safety stop active: Robot pitch exceeds threshold. Sending zero action.")
-            # Send the robot to a safe position with wheels stopped
-            hip, knee = self.inverse_kinematics(0.0,0.01)  # Ensure some minimum height for stability
-            leg_cmd = Float64MultiArray()
-            leg_cmd.data = [float(hip), float(hip)]
-            self.legs_controller.publish(leg_cmd)
-            # wheel_cmd = Float64MultiArray()
-            # wheel_cmd.data = [0.0, 0.0]
-            # self.wheel_controller.publish(wheel_cmd)
-            
-            # Update previous action to zeros
-            self.previous_action = np.zeros(2)
-            return
         
         # velocity_des = np.zeros(2)
         exec_actions = np.clip(action, -100.0, 100.0)
@@ -159,13 +227,11 @@ class ControlNode(Node):
 
         hip, knee = self.inverse_kinematics(0, self.height)
 
-        # self.get_logger().info(f"Actions (0): {velocity_des[0]:.3f}, Actions (1): {velocity_des[1]:.3f}, Height: {self.height:.3f}")
-
         wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
 
         # First two actions control wheels
-        wheel_cmd.data = [float(self.velocity_des[0] * 1.0), float(self.velocity_des[1] * 1.0)]
+        wheel_cmd.data = [float(self.velocity_des[0]), float(self.velocity_des[1])]
         
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, hip]
@@ -211,32 +277,47 @@ class ControlNode(Node):
         base_quat = [msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w]
         gravity_vector = np.array([0, 0, -1])
 
+        # Store raw angular velocity
         self.angular_velocity = np.array([msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z])
-
+        
+        # Extract Euler angles
         euler_angles = R.from_quat(base_quat).as_euler('xyz')
         self.roll = euler_angles[0]
         self.pitch = euler_angles[1]
-        self.yaw = euler_angles[2]
-
+        raw_yaw = euler_angles[2]  # Store raw yaw before adjustment
+        
+        # Initialize yaw offset once
         if self.yaw_offset is None:
-            self.yaw_offset = self.yaw
+            self.yaw_offset = raw_yaw
             self.get_logger().info(f"Yaw Offset Initialized: {np.degrees(self.yaw_offset):.2f}")
-        else:
-            self.yaw -= self.yaw_offset
-
-        # Compute rotation matrix from base_quat
+        
+        # Calculate corrected yaw (this is just for display and control purposes)
+        self.yaw = raw_yaw - self.yaw_offset
+        
+        # Compute rotation matrix from quaternion (represents current orientation)
         rotation_matrix = R.from_quat(base_quat).as_matrix()
-
-        # Project global gravity vector (0, 0, -1) into robot frame
-        projected_gravity = rotation_matrix.T @ gravity_vector  # robot sees gravity pointing this way
-
-        # Now rotate the projected gravity vector by -yaw_offset to align to initial yaw
-        if self.yaw_offset is not None:
-            yaw_correction = R.from_euler('z', -self.yaw_offset).as_matrix()
-            projected_gravity = yaw_correction @ projected_gravity
-
-        self.projected_gravity = projected_gravity
-
+        
+        # Project global gravity vector into robot frame
+        robot_frame_gravity = rotation_matrix.T @ gravity_vector
+        
+        # Create a rotation matrix for yaw correction only
+        # This rotates vectors around the z-axis by -yaw_offset
+        # We use the negative of yaw_offset because we want to undo the initial yaw
+        cos_offset = np.cos(-self.yaw_offset)
+        sin_offset = np.sin(-self.yaw_offset)
+        yaw_correction = np.array([
+            [cos_offset, -sin_offset, 0],
+            [sin_offset, cos_offset, 0],
+            [0, 0, 1]
+        ])
+        
+        # Apply yaw correction to get gravity in yaw-corrected frame
+        self.projected_gravity = yaw_correction @ robot_frame_gravity
+        
+        # Assign angular velocities for control use
+        self.pitch_vel = self.angular_velocity[1]  # y-axis angular velocity
+        self.yaw_vel = self.angular_velocity[2]    # z-axis angular velocity
+        
         # Safety check
         if abs(self.pitch) > self.pitch_threshold and not self.safety_triggered:
             self.safety_triggered = True
@@ -291,10 +372,62 @@ class ControlNode(Node):
             prev_angular_z != self.desired_angular_z or
             prev_state != msg.state):
 
-            self.current_state = msg.state
-            
-            self.get_logger().info(f"Received command - Height: {self.height:.2f}, Linear X: {self.desired_linear_x:.2f}, Angular Z: {self.desired_angular_z:.2f}, State: {msg.state}")
+            self.current_state = msg.state      
+
+    def log_data_point(self, pitch, pitch_vel, yaw, yaw_vel, left_torque, right_torque, 
+                      left_vel, right_vel, avg_vel, desired_lin_x, desired_ang_z, height):
+        """Log a single data point to the data_log list"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         
+        data_point = {
+            'timestamp': timestamp,
+            'pitch': pitch,
+            'pitch_vel': pitch_vel,
+            'yaw': yaw,
+            'yaw_vel': yaw_vel,
+            'left_wheel_torque': left_torque,
+            'right_wheel_torque': right_torque,
+            'left_wheel_velocity': left_vel,
+            'right_wheel_velocity': right_vel,
+            'avg_velocity': avg_vel,
+            'desired_linear_x': desired_lin_x,
+            'desired_angular_z': desired_ang_z,
+            'height': height
+        }
+        
+        self.data_log.append(data_point)
+        
+        # Auto-save if we've reached the threshold
+        if len(self.data_log) >= self.auto_save_threshold:
+            self.save_data()
+            
+    def save_data_timer_callback(self):
+        """Periodically save data to prevent loss"""
+        if len(self.data_log) > 0 and self.logdata:
+            self.save_data()
+            
+    def save_data(self):
+        """Save the logged data to an Excel file"""
+        if not self.data_log:
+            self.get_logger().info("No data to save")
+            return
+            
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"werdna_log_{timestamp}.xlsx"
+            filepath = os.path.join(self.log_directory, filename)
+            
+            # Convert to DataFrame and save
+            df = pd.DataFrame(self.data_log)
+            df.to_excel(filepath, index=False)
+            
+            self.get_logger().info(f"Saved {len(self.data_log)} data points to {filepath}")
+            
+            # Clear the log after saving
+            self.data_log = []
+            
+        except Exception as e:
+            self.get_logger().error(f"Failed to save data: {str(e)}")  
        
 
 def main(args=None):

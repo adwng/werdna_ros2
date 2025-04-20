@@ -3,13 +3,13 @@ from rclpy.node import Node
 import numpy as np
 from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import Imu, JointState
-from nav_msgs.msg import Odometry
 from werdna_msgs.msg import JoyCtrlCmds
 
 from scipy.spatial.transform import Rotation as R
 
 import os
-import time
+from datetime import datetime
+import pandas as pd
 import yaml
 
 import math
@@ -132,11 +132,8 @@ class ControlNode(Node):
 
         self.angular_velocity = np.array([0.0, 0.0, 0.0])
         self.linear_accelerations = np.array([0.0, 0.0, 0.0])
-        self.projected_gravity = np.array([0.0, 0.0, 0.0])
         self.joint_positions = {joint: 0.0 for joint in self.target_joints}
         self.joint_velocities = {joint: 0.0 for joint in self.target_joints}
-        self.previous_action = np.zeros(2)  # 2 wheels
-        self.velocity_des = np.zeros(2)
 
         self.wheel_radius = 0.0855
         self.wheel_circumference = np.pi * self.wheel_radius
@@ -156,6 +153,9 @@ class ControlNode(Node):
         self.roll = 0.0
         self.pitch_vel = 0.0
         self.yaw_vel = 0.0
+
+        # Control loop rate (Hz)
+        self.control_rate = 100  # 100Hz or 0.01s period
         
         # Setup PID controllers
         self.velocity_pid_config = PIDConfig()
@@ -170,10 +170,6 @@ class ControlNode(Node):
         self.steer_pid_state = PIDState()
         self.steer_pid = PID(self.steer_pid_config, self.steer_pid_state)
         
-        # Control loop rate (Hz)
-        self.control_rate = 100  # 100Hz or 0.01s period
-        self.alpha = pow(0.5, self.control_rate / 0.1) # Tune between 0.1 and 0.3
-        
         # Load PID configurations
         config_file = "/home/andrew/werdna_ws/src/werdna_ros2/pid.yaml"
         self.load_config(config_file)
@@ -182,6 +178,43 @@ class ControlNode(Node):
         self.runtime = self.create_timer(timer_period, self.runtime_callback)
         
         self.get_logger().info("Werdna Control Node initialization complete!")
+
+        # Add data logging for Excel
+        self.data_log = []
+        self.log_columns = [
+            'timestamp', 
+            'pitch', 
+            'pitch_vel',
+            'yaw',
+            'yaw_vel', 
+            'left_wheel_torque', 
+            'right_wheel_torque',
+            'left_wheel_velocity', 
+            'right_wheel_velocity',
+            'avg_velocity',
+            'desired_linear_x', 
+            'desired_angular_z',
+            'height'
+        ]
+        
+        # Configure logging frequency (e.g., log every 5 control cycles)
+        self.log_frequency = 5
+        self.log_counter = 0
+        
+        # Prepare for Excel logging
+        self.log_directory = os.path.expanduser("~/werdna_logs")
+        if not os.path.exists(self.log_directory):
+            os.makedirs(self.log_directory)
+            self.get_logger().info(f"Created log directory: {self.log_directory}")
+        
+        # Auto-save every N data points to prevent data loss
+        self.auto_save_threshold = 500
+        
+        # Add shutdown hook for saving data
+        self.get_logger().info("Data logging initialized")
+        
+        # Add a timer to periodically save data (every 60 seconds)
+        self.save_timer = self.create_timer(15.0, self.save_data_timer_callback)
     
     def load_config(self, config_file):
         try:
@@ -221,6 +254,7 @@ class ControlNode(Node):
             # Additional parameters
             self.pitch_offset = config.get("offset", 0.0)
             self.accel_gain = config.get("accel_gain", 0.0)
+            self.logdata = config.get("SaveData", False)
             
             self.get_logger().info(f"PID configuration loaded from {config_file}")
             
@@ -252,7 +286,6 @@ class ControlNode(Node):
             return
 
         # === OUTER VELOCITY LOOP ===
-        # Get current wheel velocities (convert wheel angular speeds to linear velocity using wheel_radius)
         wheel_radius = 0.0855  # Adjust as needed for your robot
         left_vel = self.joint_velocities["left_wheel_joint"] * wheel_radius
         right_vel = self.joint_velocities["right_wheel_joint"] * wheel_radius
@@ -298,27 +331,47 @@ class ControlNode(Node):
         right_wheel_torque = balance_output + steer_output
         action = np.array([left_wheel_torque, right_wheel_torque])
 
+        if self.logdata:
+            # Log data for Excel export
+            self.log_counter += 1
+            if self.log_counter >= self.log_frequency:
+                self.log_counter = 0
+                self.log_data_point(
+                    self.pitch,
+                    self.pitch_vel,
+                    self.yaw,
+                    self.yaw_vel,
+                    left_wheel_torque,
+                    right_wheel_torque,
+                    left_vel,
+                    right_vel,
+                    avg_velocity,
+                    self.desired_linear_x,
+                    self.desired_angular_z,
+                    self.height
+                )
+
         self.step(action)
 
         # === DEBUG INFO ===
         # Only log at 5Hz to avoid flooding the console
-        if int(time.time() * 5) % 5 == 0:  # Log at approximately 1Hz
-            self.get_logger().info(
-                "\n========== PID CONTROL ==========\n"
-                f"Target Pitch        : {target_pitch:.3f} rad\n"
-                f"Pitch               : {self.pitch:.3f} rad\n"
-                f"Pitch Error         : {self.balance_pid_state.error:.3f} rad\n"
-                f"Pitch P Term        : {self.balance_pid_state.p:.3f}\n"
-                f"Pitch D Term        : {self.balance_pid_state.d:.3f}\n"
-                f"Pitch Rate          : {self.pitch_vel:.3f} rad/s\n"
-                f"Yaw Velocity        : {self.yaw_vel:.3f} rad/s\n"
-                f"Desired Lin Vel X   : {self.desired_linear_x:.2f}\n"
-                f"Estimated Avg Vel   : {avg_velocity:.2f}\n"
-                f"Velocity Error      : {self.velocity_pid_state.error:.2f}\n"
-                f"Velocity Integral   : {self.velocity_pid_state.integral:.2f}\n"
-                f"Wheel Commands      : [{action[0]:.2f}, {action[1]:.2f}]\n"
-                "=================================="
-            )
+        # if int(time.time() * 5) % 5 == 0:  # Log at approximately 1Hz
+        #     self.get_logger().info(
+        #         "\n========== PID CONTROL ==========\n"
+        #         f"Target Pitch        : {target_pitch:.3f} rad\n"
+        #         f"Pitch               : {self.pitch:.3f} rad\n"
+        #         f"Pitch Error         : {self.balance_pid_state.error:.3f} rad\n"
+        #         f"Pitch P Term        : {self.balance_pid_state.p:.3f}\n"
+        #         f"Pitch D Term        : {self.balance_pid_state.d:.3f}\n"
+        #         f"Pitch Rate          : {self.pitch_vel:.3f} rad/s\n"
+        #         f"Yaw Velocity        : {self.yaw_vel:.3f} rad/s\n"
+        #         f"Desired Lin Vel X   : {self.desired_linear_x:.2f}\n"
+        #         f"Estimated Avg Vel   : {avg_velocity:.2f}\n"
+        #         f"Velocity Error      : {self.velocity_pid_state.error:.2f}\n"
+        #         f"Velocity Integral   : {self.velocity_pid_state.integral:.2f}\n"
+        #         f"Wheel Commands      : [{action[0]:.2f}, {action[1]:.2f}]\n"
+        #         "=================================="
+        #     )
 
 
     def step(self, action):
@@ -419,7 +472,6 @@ class ControlNode(Node):
         self.pitch_vel = self.angular_velocity[1]  # y-axis angular velocity
         self.yaw_vel = self.angular_velocity[2]    # z-axis angular velocity
 
-
     def joint_callback(self, msg):
         # The order in which joint_states comes in
         received_order = ["left_hip_motor_joint", "left_knee_joint", "left_wheel_joint", 
@@ -434,7 +486,6 @@ class ControlNode(Node):
             if joint in positions:
                 self.joint_positions[joint] = positions[joint]
                 self.joint_velocities[joint] = velocities[joint]
-
 
     def command_callback(self, msg):
         # Store previous values for change detection
@@ -459,7 +510,61 @@ class ControlNode(Node):
             
             # self.get_logger().info(f"Received command - Height: {self.height:.2f}, Linear X: {self.desired_linear_x:.2f}, Angular Z: {self.desired_angular_z:.2f}, State: {msg.state}")
         
-    
+    def log_data_point(self, pitch, pitch_vel, yaw, yaw_vel, left_torque, right_torque, 
+                      left_vel, right_vel, avg_vel, desired_lin_x, desired_ang_z, height):
+        """Log a single data point to the data_log list"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        
+        data_point = {
+            'timestamp': timestamp,
+            'pitch': pitch,
+            'pitch_vel': pitch_vel,
+            'yaw': yaw,
+            'yaw_vel': yaw_vel,
+            'left_wheel_torque': left_torque,
+            'right_wheel_torque': right_torque,
+            'left_wheel_velocity': left_vel,
+            'right_wheel_velocity': right_vel,
+            'avg_velocity': avg_vel,
+            'desired_linear_x': desired_lin_x,
+            'desired_angular_z': desired_ang_z,
+            'height': height
+        }
+        
+        self.data_log.append(data_point)
+        
+        # Auto-save if we've reached the threshold
+        if len(self.data_log) >= self.auto_save_threshold:
+            self.save_data()
+            
+    def save_data_timer_callback(self):
+        """Periodically save data to prevent loss"""
+        if len(self.data_log) > 0 and self.logdata:
+            self.save_data()
+            
+    def save_data(self):
+        """Save the logged data to an Excel file"""
+        if not self.data_log:
+            self.get_logger().info("No data to save")
+            return
+            
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"werdna_log_{timestamp}.xlsx"
+            filepath = os.path.join(self.log_directory, filename)
+            
+            # Convert to DataFrame and save
+            df = pd.DataFrame(self.data_log)
+            df.to_excel(filepath, index=False)
+            
+            self.get_logger().info(f"Saved {len(self.data_log)} data points to {filepath}")
+            
+            # Clear the log after saving
+            self.data_log = []
+            
+        except Exception as e:
+            self.get_logger().error(f"Failed to save data: {str(e)}")
+
 def main(args=None):
     rclpy.init(args=args)
     node = ControlNode()

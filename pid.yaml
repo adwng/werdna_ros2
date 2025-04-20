@@ -6,10 +6,10 @@ balance_ki: 0.015 #Tune
 balance_ilimit: 0.15
 
 # Velocity PID (outer loop for speed control)
-velocity_kp: -1.5 # Tune
-velocity_ki: -0.3 # Tune
+velocity_kp: -1.25 # Tune
+velocity_ki: -1.25 # Tune
 # velocity_kd: 0.0
-velocity_ilimit: 0.2 # Tune 
+velocity_ilimit: 1.0 # Tune 
 # velocity_iratelimit: 0.0 # Tune
 # velocity_kpkd_limit: 0.0
 # velocity_max_rate: 0.0 # Tune
@@ -23,3 +23,4 @@ steer_ilimit: 0.0
 # General settings
 offset: -0.0     # Pitch offset/trim
 accel_gain: 0.0  # Acceleration feedforward gain
+SaveData: False

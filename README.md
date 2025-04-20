@@ -1,18 +1,14 @@
 # WERDNA
-Wheeled Bipedal Trained by RL for Locomotion and Posture Control. These are the ROS2 implementations to be run on a Raspberry Pi 4 with *Ubuntu Mate* and *ROS2 Humble*. For the custom gym environments can be found [here](https://github.com/adwng/werdna_gym/tree/Advanced).
+Wheeled Bipedal Trained by RL for Locomotion and Posture Control. These are the ROS2 implementations to be run on a Raspberry Pi 4 with *Ubuntu Mate* and *ROS2 Humble*. For the custom gym environments can be found [here](https://github.com/adwng/werdna_genesis).
 
 The RPI4 is also intended to be connected to a pi3hat from mjbots which will be commanding the Moteus Drivers to actuate accordingly. 
-
-> [!NOTE] 
-> It is a Final Year Thesis Project and it is still not finalized.
-
 
 <details>
   <summary>Dependencies</summary>
 
   1. `ROS2 Control`
   2. `ROS2 Controllers` 
-  3. `ONXX RunTime`
+  3. `Torch`
   4. `Moteus`
   5. `pi3hat`
    
@@ -44,38 +40,34 @@ export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/werdna_ros2/pi3hat_h
 sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup launch_robot.py
 ```
 
-It should should launch the description, relevant controllers and hardware interface.
+It should should launch the description, relevant controllers, rosboard and hardware interface.
 
 > [!NOTE]
 > If wish to view ROS2 topics and also enable your other programs to publish/subscribe to it. Ensure the session is enabled the same way as the script above (entering superuser mode->exporting profiles->sourcing relevant environments).
+> `sudo -E /home/andrew/runasroot.sh rviz2`
 > Of course, it can be launched all together with the same launch file
-
-
-## TODO
-- [x] Write pi3hat hardware interface instead of using esp32 
-- [x] Rewrite agent node to use onxxruntime
-- [x] Rewrite messages and teleop nodes to accomodate for new observation spaces.
-- [x] Update URDF as wheel
-- [ ] Test controller interface
 
 ## Features
 - [x] **BringUp Actions**: Launches the Controllers, Hardware Interface, Teleoperation Node for Joysticks, and the trained agent's inference node at once
 - [x] **Description**: Contains URDF for the Werdna Robot and linked it to the hardware interface
 - [x] **Hardware Interface**: Overlays the Pi3Hat to communicate with moteus controllers via ROS2 Control
 - [x] **Messages**: Custom Messages for the robot
-- [x] **Odometry Broadcaster**: A copy from diff drive controller source code with only the odometry contents, meant to publish odometry from wheel positions
+- [x] **Odometry Broadcaster**: Uses IMU and Joints to Compute Odometry, IMU, and TF.
 - [x] **Teleop**: Maps Joystick Interface to the custom messages
+- [x] **Agent**: Run inferences
 
 ## PI3HAT HARWARE INTERFACE DETAILS
 ### Command Interfaces
 - Position
 - Torque
+- Torqe
 
 Selected based on *control mode* in the urdf file, it requires manual adjustment on the acceleration and velocity limits. 
 
 ### State Interfaces
 - Position 
 - Velocity
+- Effort
 - Quarternion Orientation
 - Angular Velocities
 - Linear Acceleration
@@ -88,6 +80,7 @@ Selected based on *control mode* in the urdf file, it requires manual adjustment
         <param name="imu_mounting_deg.yaw">0</param>
         <param name="imu_mounting_deg.pitch">0</param>
         <param name="imu_mounting_deg.roll">0</param>
+        <param name="logging">0</param>
     </hardware>
 
     <joint name="joint_1">
