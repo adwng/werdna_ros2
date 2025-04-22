@@ -82,8 +82,6 @@ class ControlNode(Node):
         
         self.get_logger().info("Safety parameters configured:")
         self.get_logger().info(f"  - Pitch threshold: {self.pitch_threshold:.2f} radians ({np.degrees(self.pitch_threshold):.1f} degrees)")
-        
-        self.get_logger().info("Werdna Control Node initialization complete!")
 
         timer_period = 0.02 # every 0.02 seconds //50Hz
         self.runtime = self.create_timer(timer_period, self.runtime_callback)
@@ -236,8 +234,8 @@ class ControlNode(Node):
         # Remaining actions control the leg joints
         leg_cmd.data = [hip, hip]
         
-        self.wheel_controller.publish(wheel_cmd)
-        self.legs_controller.publish(leg_cmd)
+        # self.wheel_controller.publish(wheel_cmd)
+        # self.legs_controller.publish(leg_cmd)
     
     def inverse_kinematics(self, x=0, y=0):
         try:
