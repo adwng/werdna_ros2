@@ -28,12 +28,6 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(ros2_control_launch_file)
     )
 
-
-    # agent_node = ExecuteProcess(
-    #     cmd=["ros2", "run", "werdna_agent", "werdna_agent_node"],
-    #     output="screen",
-    # )
-
     agent_node = ExecuteProcess(
         cmd=["ros2", "run", "werdna_pid", "werdna_pid_node"],
         output="screen",
@@ -43,10 +37,16 @@ def generate_launch_description():
         cmd=["ros2", "run", "rosboard", "rosboard_node"],
         output="screen"
     )
+
+    lidar = ExecuteProcess(
+        cmd=["ros2", "launch", "sllidar_ros2", "sllidar_c1_launch.py"],
+        output="screen"
+    )
     
     return LaunchDescription([
         teleop,
         ros2_control,
         agent_node,
+        lidar,
         rosboard,
     ])

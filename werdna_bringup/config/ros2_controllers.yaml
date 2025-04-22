@@ -15,12 +15,20 @@ controller_manager:
     odometry_broadcaster:
       type: werdna_odometry_broadcaster/WerdnaOdometryBroadcaster
 
+#     imu_broadcaster:
+#       type: imu_sensor_broadcaster/IMUSensorBroadcaster
+
+# imu_broadcaster:
+#   ros__parameters:
+#     sensor_name: "imu_sensor"
+#     frame_id:  "imu_sensor_frame"
+
 position_controller:
   ros__parameters:
     joints:
-      - left_hip_motor_joint
+      - left_hip_joint
       # - left_knee_joint
-      - right_hip_motor_joint
+      - right_hip_joint
       # - right_knee_joint
 
 wheel_controller:
@@ -36,7 +44,7 @@ odometry_broadcaster:
     left_wheel_names: left_wheel_joint
     right_wheel_names: right_wheel_joint
 
-    wheel_separation: 0.3356
+    wheel_separation: 0.2915
 
     wheel_radius: 0.0855
     

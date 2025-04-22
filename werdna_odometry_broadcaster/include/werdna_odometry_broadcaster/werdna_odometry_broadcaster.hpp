@@ -116,6 +116,10 @@ protected:
     double odom_y_vel_;
     double odom_yaw_vel_;
     tf2::Quaternion odom_orientation_;
+
+    bool isStart = true;
+    double left_wheel_pos_offset = 0.0;
+    double right_wheel_pos_offset = 0.0;
 };
 }  // namespace werdna_odometry_broadcaster
 #endif  // WERDNA_ODOMETRY_BROADCASTER__WERDNA_ODOMETRY_BROADCASTER_HPP_

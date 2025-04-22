@@ -113,6 +113,15 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
     return controller_interface::return_type::ERROR;
   }
 
+  //Read offset of the wheels positon and velocity
+  if (isStart)
+  {
+    left_wheel_pos_offset = left_wheel_pos;
+    right_wheel_pos_offset = right_wheel_pos;
+    isStart = false;
+
+  }
+
     // convert orientation to Euler angles
   tf2::Quaternion q(
     orientation_x,
@@ -128,9 +137,9 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
   pitch_ = imu_pitch;
 
   // calculate linear position and velocity for each wheel from rotational position
-  double right_wheel_tangential_pos = right_wheel_pos * params_.wheel_radius;
+  double right_wheel_tangential_pos = (right_wheel_pos - right_wheel_pos_offset)* params_.wheel_radius;
   double right_wheel_tangential_vel = right_wheel_vel * params_.wheel_radius;
-  double left_wheel_tangential_pos = left_wheel_pos * params_.wheel_radius;
+  double left_wheel_tangential_pos = (left_wheel_pos - left_wheel_pos_offset) * params_.wheel_radius;
   double left_wheel_tangential_vel = left_wheel_vel * params_.wheel_radius;
   
   double delta_x = 0.5 * (right_wheel_tangential_pos + left_wheel_tangential_pos) - x_;

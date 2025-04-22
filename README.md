@@ -1,5 +1,5 @@
 # WERDNA
-Wheeled Bipedal Trained by RL for Locomotion and Posture Control. These are the ROS2 implementations to be run on a Raspberry Pi 4 with *Ubuntu Mate* and *ROS2 Humble*. For the custom gym environments can be found [here](https://github.com/adwng/werdna_genesis).
+Wheeled Bipedal. These are the ROS2 implementations to be run on a Raspberry Pi 4 with *Ubuntu Mate* and *ROS2 Humble*. For the custom gym environments can be found [here](https://github.com/adwng/werdna_genesis).
 
 The RPI4 is also intended to be connected to a pi3hat from mjbots which will be commanding the Moteus Drivers to actuate accordingly. 
 
@@ -35,10 +35,24 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 |***UDP Memory Switch***|Force FastDDS to use UDP instead of shared memory|
 |***Watchdog Timer***|Increase the watchdog timer for each servo to at least 0.5s to avoid mode 11 timeout bug|
 
+`Launch Controllers`
 ```
 export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/werdna_ros2/pi3hat_hardware_interface/fastrtps_profile_no_shmem.xml
 sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup launch_robot.py
 ```
+
+"Launch this for mapping and save new map"
+```
+export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/werdna_ros2/pi3hat_hardware_interface/fastrtps_profile_no_shmem.xml
+sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup mapping_slam.launch.py
+```
+
+For Localization and Path Planning
+```
+export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/werdna_ros2/pi3hat_hardware_interface/fastrtps_profile_no_shmem.xml
+sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup localization.py map:=$HOME/map.yaml
+```
+
 
 It should should launch the description, relevant controllers, rosboard and hardware interface.
 
@@ -54,7 +68,7 @@ It should should launch the description, relevant controllers, rosboard and hard
 - [x] **Messages**: Custom Messages for the robot
 - [x] **Odometry Broadcaster**: Uses IMU and Joints to Compute Odometry, IMU, and TF.
 - [x] **Teleop**: Maps Joystick Interface to the custom messages
-- [x] **Agent**: Run inferences
+- [x] **PID**: Run inferences
 
 ## PI3HAT HARWARE INTERFACE DETAILS
 ### Command Interfaces

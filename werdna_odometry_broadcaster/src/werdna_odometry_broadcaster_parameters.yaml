@@ -11,12 +11,12 @@ werdna_odometry_broadcaster:
   }
   left_hip_name: {
     type: string,
-    default_value: 'left_hip_motor_joint',
+    default_value: 'left_hip_joint',
     description: 'Name of the left hip joint'
   }
   right_hip_name: {
     type: string,
-    default_value: 'right_hip_motor_joint',
+    default_value: 'right_hip_joint',
     description: 'Name of the right hip joint'
   }
   left_knee_name: {

@@ -91,12 +91,13 @@ def generate_launch_description():
             on_exit=[odometry_broadcaster_spawner]
         )
     )
+    
+
 
     nodes = [
         robot_state_pub_node,
         control_node,
         # joint_state_broadcaster_spawner,
-        # delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
         robot_controller_spawner,
         delay_wheel_controller_spawner_after_robot_controller_spawner,
         delay_odometry_broadcaster_spawner_after_wheel_controller_spawner

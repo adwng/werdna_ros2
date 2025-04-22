@@ -3,6 +3,7 @@ from rclpy.node import Node
 import numpy as np
 from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import Imu, JointState
+from geometry_msgs.msg import Twist
 from werdna_msgs.msg import JoyCtrlCmds
 
 from scipy.spatial.transform import Rotation as R
@@ -111,6 +112,7 @@ class ControlNode(Node):
         self.imu_subscriber = self.create_subscription(Imu, '/imu/data', self.imu_callback, 10)
         self.joint_subscriber = self.create_subscription(JointState, '/joint_states', self.joint_callback, 10)
         self.command_subscriber = self.create_subscription(JoyCtrlCmds, '/werdna_control', self.command_callback, 10)
+        self.nav2_subscriber = self.create_subscription(Twist, "cmd_vel", self.nav2_callback, 10)
         self.get_logger().info("Subscribers initialized")
 
         # Publishers
@@ -128,8 +130,12 @@ class ControlNode(Node):
         self.right_height = 0
         self.left_wheel = 0
         self.right_wheel = 0
-        self.desired_linear_x = 0
-        self.desired_angular_z = 0
+        #joystick
+        self.linear_x_joy = 0
+        self.angular_z_joy = 0
+        #nav2
+        self.linear_x_nav2 = 0
+        self.angular_z_nav2 = 0
 
         self.angular_velocity = np.array([0.0, 0.0, 0.0])
         self.linear_accelerations = np.array([0.0, 0.0, 0.0])
@@ -184,6 +190,8 @@ class ControlNode(Node):
         self.data_log = []
         self.log_columns = [
             'timestamp', 
+            'roll',
+            'roll_vel'
             'pitch', 
             'pitch_vel',
             'yaw',
@@ -195,7 +203,9 @@ class ControlNode(Node):
             'avg_velocity',
             'desired_linear_x', 
             'desired_angular_z',
-            'height'
+            'left_height',
+            'right_height',
+            'average_height'
         ]
         
         # Configure logging frequency (e.g., log every 5 control cycles)
@@ -285,6 +295,16 @@ class ControlNode(Node):
             wheel_cmd.data = [0.0, 0.0]
             self.wheel_controller.publish(wheel_cmd)
             return
+        
+        desired_linear_x = 0
+        desired_angular_z = 0
+        
+        if (abs(self.linear_x_joy) <= 0.005 and abs(self.angular_z_joy) <= 0.05):
+            desired_linear_x = self.linear_x_joy
+            desired_angular_z = self.angular_z_joy
+        else:
+            desired_linear_x = self.linear_x_nav2
+            desired_angular_z = self.angular_z_nav2
 
         # === OUTER VELOCITY LOOP ===
         wheel_radius = 0.0855  # Adjust as needed for your robot
@@ -296,7 +316,7 @@ class ControlNode(Node):
 
         target_pitch = self.velocity_pid.apply(
             avg_velocity,  
-            self.desired_linear_x, 
+            desired_linear_x, 
             0.0,
             0.0, 
             self.control_rate  
@@ -319,7 +339,7 @@ class ControlNode(Node):
             # Apply steering PID controller
             steer_output = self.steer_pid.apply(
                 self.yaw_vel, 
-                self.desired_angular_z,
+                desired_angular_z,
                 0.0,  
                 0.0,  
                 self.control_rate  
@@ -340,6 +360,8 @@ class ControlNode(Node):
             if self.log_counter >= self.log_frequency:
                 self.log_counter = 0
                 self.log_data_point(
+                    self.roll,
+                    self.roll_vel,
                     self.pitch,
                     self.pitch_vel,
                     self.yaw,
@@ -349,8 +371,10 @@ class ControlNode(Node):
                     left_vel,
                     right_vel,
                     avg_velocity,
-                    self.desired_linear_x,
-                    self.desired_angular_z,
+                    desired_linear_x,
+                    desired_angular_z,
+                    self.left_height,
+                    self.right_height,
                     total_height
                 )
 
@@ -475,6 +499,7 @@ class ControlNode(Node):
             self.safety_triggered = False
             self.get_logger().info(f"Robot back within safe pitch range ({np.degrees(self.pitch):.1f}°). Movement enabled.")
 
+        self.roll_vel = self.angular_velocity[0]
         self.pitch_vel = self.angular_velocity[1]  # y-axis angular velocity
         self.yaw_vel = self.angular_velocity[2]    # z-axis angular velocity
 
@@ -493,39 +518,45 @@ class ControlNode(Node):
                 self.joint_positions[joint] = positions[joint]
                 self.joint_velocities[joint] = velocities[joint]
 
+    def nav2_callback(self, msg):
+        self.linear_x_nav2 = msg.linear.x * 0.05
+        self.angular_z_nav2 = msg.angular.z * 1.0
+    
     def command_callback(self, msg):
         # Store previous values for change detection
         prev_left_height = self.left_height
         prev_right_height = self.right_height
-        prev_linear_x = self.desired_linear_x
-        prev_angular_z = self.desired_angular_z
+        prev_linear_x = self.linear_x_joy
+        prev_angular_z = self.angular_z_joy
         prev_state = hasattr(self, 'prev_state') and self.prev_state
         
         # Update current values
         self.left_height = msg.left_height
         self.right_height = msg.right_height
-        self.desired_linear_x = msg.linear.x * 0.05
-        self.desired_angular_z = msg.angular.z * -0.5
+        self.linear_x_joy = msg.linear.x * 0.05
+        self.angular_z_joy = msg.angular.z * 1.0
         self.prev_state = msg.state
         
         # Log commands when they change
         if (prev_left_height != self.left_height or
             prev_right_height != self.right_height or  
-            prev_linear_x != self.desired_linear_x or 
-            prev_angular_z != self.desired_angular_z or
+            prev_linear_x != self.linear_x_joy or 
+            prev_angular_z != self.angular_z_joy or
             prev_state != msg.state):
 
             self.current_state = msg.state
             
             # self.get_logger().info(f"Received command - Height: {self.height:.2f}, Linear X: {self.desired_linear_x:.2f}, Angular Z: {self.desired_angular_z:.2f}, State: {msg.state}")
         
-    def log_data_point(self, pitch, pitch_vel, yaw, yaw_vel, left_torque, right_torque, 
-                      left_vel, right_vel, avg_vel, desired_lin_x, desired_ang_z, height):
+    def log_data_point(self, roll, roll_vel,pitch, pitch_vel, yaw, yaw_vel, left_torque, right_torque, 
+                      left_vel, right_vel, avg_vel, desired_lin_x, desired_ang_z, left_height, right_height, average_height):
         """Log a single data point to the data_log list"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         
         data_point = {
             'timestamp': timestamp,
+            'roll': roll,
+            'roll_vel': roll_vel,
             'pitch': pitch,
             'pitch_vel': pitch_vel,
             'yaw': yaw,
@@ -537,7 +568,9 @@ class ControlNode(Node):
             'avg_velocity': avg_vel,
             'desired_linear_x': desired_lin_x,
             'desired_angular_z': desired_ang_z,
-            'height': height
+            'left_height': left_height,
+            'right_height': right_height,
+            'height': average_height
         }
         
         self.data_log.append(data_point)

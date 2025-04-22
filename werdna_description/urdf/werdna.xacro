@@ -26,6 +26,44 @@
         </collision>
     </link>
 
+    <link name="battery_link">
+        <xacro:inertial_box mass="${battery_mass}" x="${battery_length}" y="${battery_width}" z="${battery_height}">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_box>
+        <visual>
+            <origin xyz="0 0 0" rpy="0.0 0.0 0.0"/>
+            <geometry>
+                <box size="${battery_length} ${battery_width} ${battery_height}"/>
+            </geometry>
+            <material name="blue"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0.0 0.0 0.0"/>
+            <geometry>
+                <box size="${battery_length} ${battery_width} ${battery_height}"/>
+            </geometry>
+            <material name="blue"/>
+        </collision>
+    </link>
+
+    <joint name="battery_joint" type="fixed">
+        <origin xyz="${battery_offset_x} ${battery_offset_y} ${battery_offset_z}" rpy="0.0 0.0 ${pi/2}"/>
+        <parent link="base_link"/>
+        <child link="battery_link"/>
+    </joint>
+
+    <!-- BASE_FOOTPRINT LINK -->
+
+    <joint name="base_footprint_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="base_footprint"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="base_footprint">
+    </link>
+
+
     <!-- imu -->
     <!-- <link name="imu_link"></link> -->
 
@@ -37,7 +75,7 @@
     </joint> -->
 
     <!-- Left Hip - Gearbox -->
-    <link name="left_hip_motor_link">
+    <!-- <link name="left_hip_motor_link">
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
@@ -62,8 +100,8 @@
         <parent link="base_link"/>
         <child link="left_hip_motor_link"/>
         <axis xyz="0.0 0.0 1.0"/>
-        <limit lower="${low_limit}" upper="${high_limit}" velocity="${velocity}" effort="${effort}"/>
-    </joint>
+        <limit lower="-0.524" upper="0.524" velocity="10" effort="20"/>
+    </joint> -->
 
     <link name="left_hip_link">
         <visual>
@@ -85,10 +123,12 @@
         </xacro:inertial_box>
     </link>
 
-    <joint name="left_hip_joint" type="fixed">
-        <origin xyz="0.0 0 -${gearbox_thickness/2 + rod_length/2}" rpy="0 0 0"/>
-        <parent link="left_hip_motor_link"/>
+    <joint name="left_hip_joint" type="revolute">
+        <origin xyz="0.0 ${gearbox_offset_y} 0.0" rpy="${pi/2} -${pi/6} 0.0"/>
+        <parent link="base_link"/>
         <child link="left_hip_link"/>
+        <axis xyz="0.0 0.0 1.0"/>
+        <limit lower="-0.524" upper="0.524" velocity="10" effort="20"/>
     </joint>
 
     <link name="left_knee_link">
@@ -106,7 +146,7 @@
             </geometry>
             <material name="red"/>
         </collision>
-        <xacro:inertial_box mass="${rod_mass}" x="${rod_length}" y="${rod_width}" z="${rod_height}">
+        <xacro:inertial_box mass="${knee_rod_mass}" x="${rod_length}" y="${rod_width}" z="${rod_height}">
              <origin xyz="0 0 ${rod_height/2}" rpy="0 0 ${pi/2}"/>
         </xacro:inertial_box>
     </link>
@@ -116,7 +156,7 @@
         <parent link="left_hip_link"/>
         <child link="left_knee_link"/>
         <axis xyz="0.0 -1.0 0.0"/>
-        <limit lower="${low_limit}" upper="${high_limit}" velocity="${velocity}" effort="${effort}"/>
+        <limit lower="0" upper="1.047" velocity="${velocity}" effort="${effort}"/>
     </joint>
 
     <link name="left_wheel_link">
@@ -145,7 +185,7 @@
     </joint>
 
         <!-- Right Hip - Gearbox -->
-    <link name="right_hip_motor_link">
+    <!-- <link name="right_hip_motor_link">
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
@@ -170,8 +210,8 @@
         <parent link="base_link"/>
         <child link="right_hip_motor_link"/>
         <axis xyz="0.0 0.0 1.0"/>
-        <limit lower="${low_limit}" upper="${high_limit}" velocity="${velocity}" effort="${effort}"/>
-    </joint>
+                <limit lower="-0.524" upper="0.524" velocity="10" effort="20"/>
+    </joint> -->
 
     <link name="right_hip_link">
         <visual>
@@ -193,10 +233,12 @@
         </xacro:inertial_box>
     </link>
 
-    <joint name="right_hip_joint" type="fixed">
-        <origin xyz="0.0 0 ${gearbox_thickness/2 + rod_length/2}" rpy="0 0 0"/>
-        <parent link="right_hip_motor_link"/>
+    <joint name="right_hip_joint" type="revolute">
+        <origin xyz="0.0 -${gearbox_offset_y} 0.0" rpy="${pi/2} -${pi/6} 0.0"/>
+        <parent link="base_link"/>
         <child link="right_hip_link"/>
+        <axis xyz="0.0 0.0 1.0"/>
+        <limit lower="-0.524" upper="0.524" velocity="10" effort="20"/>
     </joint>
 
     <link name="right_knee_link">
@@ -214,7 +256,7 @@
             </geometry>
             <material name="red"/>
         </collision>
-        <xacro:inertial_box mass="${rod_mass}" x="${rod_length}" y="${rod_width}" z="${rod_height}">
+        <xacro:inertial_box mass="${knee_rod_mass}" x="${rod_length}" y="${rod_width}" z="${rod_height}">
              <origin xyz="0 0 ${rod_height/2}" rpy="0 0 ${pi/2}"/>
         </xacro:inertial_box>
     </link>
@@ -224,7 +266,7 @@
         <parent link="right_hip_link"/>
         <child link="right_knee_link"/>
         <axis xyz="0.0 -1.0 0.0"/>
-        <limit lower="${low_limit}" upper="${high_limit}" velocity="${velocity}" effort="${effort}"/>
+        <limit lower="0" upper="1.047" velocity="${velocity}" effort="${effort}"/>
     </joint>
 
     <link name="right_wheel_link">
@@ -239,6 +281,13 @@
             <geometry>
                 <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
             </geometry>
+             <surface>
+                <contact>
+                <ode>
+                    <mu>0.5</mu>
+                </ode>
+                </contact>
+            </surface>
         </collision>
         <xacro:inertial_cylinder mass="${wheel_mass}" length="${wheel_length}" radius="${wheel_radius}">
             <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
