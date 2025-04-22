@@ -124,7 +124,8 @@ class ControlNode(Node):
 
         # Robot state variables
         self.current_state = False
-        self.height = 0
+        self.left_height = 0
+        self.right_height = 0
         self.left_wheel = 0
         self.right_wheel = 0
         self.desired_linear_x = 0
@@ -331,6 +332,8 @@ class ControlNode(Node):
         right_wheel_torque = balance_output + steer_output
         action = np.array([left_wheel_torque, right_wheel_torque])
 
+        total_height = 0.5 * (self.left_height + self.right_height)
+
         if self.logdata:
             # Log data for Excel export
             self.log_counter += 1
@@ -348,7 +351,7 @@ class ControlNode(Node):
                     avg_velocity,
                     self.desired_linear_x,
                     self.desired_angular_z,
-                    self.height
+                    total_height
                 )
 
         self.step(action)
@@ -379,10 +382,13 @@ class ControlNode(Node):
         # velocity_des = np.zeros(2)
         exec_actions = np.clip(action, -1.0, 1.0)
 
-        hip, knee = self.inverse_kinematics(0, self.height)
+        left_hip, left_knee = self.inverse_kinematics(0, self.left_height)
+        right_hip, right_knee = self.inverse_kinematics(0, self.right_height)
 
-        if (hip >= 0.32):
-            hip = 0.32
+        if (left_hip >= 0.32):
+            left_hip = 0.32
+        if (right_hip >= 0.32):
+            right_hip = 0.32
 
         wheel_cmd = Float64MultiArray()
         leg_cmd = Float64MultiArray()
@@ -391,7 +397,7 @@ class ControlNode(Node):
         wheel_cmd.data = [float(exec_actions[0] * 1.0), float(exec_actions[1] * 1.0)]
         
         # Remaining actions control the leg joints
-        leg_cmd.data = [float(hip), float(hip)]
+        leg_cmd.data = [float(left_hip), float(right_hip)]
         
         self.wheel_controller.publish(wheel_cmd)
         self.legs_controller.publish(leg_cmd)
@@ -489,19 +495,22 @@ class ControlNode(Node):
 
     def command_callback(self, msg):
         # Store previous values for change detection
-        prev_height = self.height
+        prev_left_height = self.left_height
+        prev_right_height = self.right_height
         prev_linear_x = self.desired_linear_x
         prev_angular_z = self.desired_angular_z
         prev_state = hasattr(self, 'prev_state') and self.prev_state
         
         # Update current values
-        self.height = msg.height
+        self.left_height = msg.left_height
+        self.right_height = msg.right_height
         self.desired_linear_x = msg.linear.x * 0.05
         self.desired_angular_z = msg.angular.z * -0.5
         self.prev_state = msg.state
         
         # Log commands when they change
-        if (prev_height != self.height or 
+        if (prev_left_height != self.left_height or
+            prev_right_height != self.right_height or  
             prev_linear_x != self.desired_linear_x or 
             prev_angular_z != self.desired_angular_z or
             prev_state != msg.state):
