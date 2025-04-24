@@ -119,7 +119,6 @@ controller_interface::return_type WerdnaOdometryBroadcaster::update(
     left_wheel_pos_offset = left_wheel_pos;
     right_wheel_pos_offset = right_wheel_pos;
     isStart = false;
-
   }
 
     // convert orientation to Euler angles

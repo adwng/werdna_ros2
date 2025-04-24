@@ -11,6 +11,7 @@ from scipy.spatial.transform import Rotation as R
 import os
 from datetime import datetime
 import pandas as pd
+import time
 import yaml
 
 import math
@@ -299,11 +300,14 @@ class ControlNode(Node):
         desired_linear_x = 0
         desired_angular_z = 0
         
-        if (abs(self.linear_x_joy) <= 0.005 and abs(self.angular_z_joy) <= 0.05):
+        if (self.linear_x_joy > 0.005 or self.linear_x_joy < 0.005):
             desired_linear_x = self.linear_x_joy
-            desired_angular_z = self.angular_z_joy
         else:
             desired_linear_x = self.linear_x_nav2
+            
+        if (self.angular_z_joy > 0.05 or self.angular_z_joy < -0.05):
+            desired_angular_z = self.angular_z_joy
+        else:
             desired_angular_z = self.angular_z_nav2
 
         # === OUTER VELOCITY LOOP ===
@@ -346,10 +350,13 @@ class ControlNode(Node):
             )
         else:
             steer_output = 0.0
+        
+        steer_output = np.clip(steer_output, -0.1, 0.1)
 
         # === TORQUE COMMANDS ===
         left_wheel_torque = balance_output - steer_output
         right_wheel_torque = balance_output + steer_output
+
         action = np.array([left_wheel_torque, right_wheel_torque])
 
         total_height = 0.5 * (self.left_height + self.right_height)
@@ -383,22 +390,26 @@ class ControlNode(Node):
         # === DEBUG INFO ===
         # Only log at 5Hz to avoid flooding the console
         # if int(time.time() * 5) % 5 == 0:  # Log at approximately 1Hz
-        #     self.get_logger().info(
-        #         "\n========== PID CONTROL ==========\n"
-        #         f"Target Pitch        : {target_pitch:.3f} rad\n"
-        #         f"Pitch               : {self.pitch:.3f} rad\n"
-        #         f"Pitch Error         : {self.balance_pid_state.error:.3f} rad\n"
-        #         f"Pitch P Term        : {self.balance_pid_state.p:.3f}\n"
-        #         f"Pitch D Term        : {self.balance_pid_state.d:.3f}\n"
-        #         f"Pitch Rate          : {self.pitch_vel:.3f} rad/s\n"
-        #         f"Yaw Velocity        : {self.yaw_vel:.3f} rad/s\n"
-        #         f"Desired Lin Vel X   : {self.desired_linear_x:.2f}\n"
-        #         f"Estimated Avg Vel   : {avg_velocity:.2f}\n"
-        #         f"Velocity Error      : {self.velocity_pid_state.error:.2f}\n"
-        #         f"Velocity Integral   : {self.velocity_pid_state.integral:.2f}\n"
-        #         f"Wheel Commands      : [{action[0]:.2f}, {action[1]:.2f}]\n"
-        #         "=================================="
-        #     )
+        # self.get_logger().info(
+        #     "\n========== PID CONTROL ==========\n"
+        #     f"Steer Action : {steer_output} rad\n"
+        #     # f"Target Pitch        : {target_pitch:.3f} rad\n"
+        #     # f"Pitch               : {self.pitch:.3f} rad\n"
+        #     # f"Yaw                 : {self.yaw:.3f} rad\n"
+        #     # f"Roll                : {self.roll:.3f} rad\n"
+        #     # f"Pitch Rate          : {self.pitch_vel:.3f} rad/s\n"
+        #     # f"Yaw Rate          : {self.yaw_vel:.3f} rad/s\n"
+        #     # f"Roll Rate          : {self.roll_vel:.3f} rad/s\n"
+        #     # f"Yaw Velocity        : {self.yaw_vel:.3f} rad/s\n"
+        #     # f"Desired Lin Vel X   : {desired_linear_x:.2f}\n"
+                # f"Desired Angular Z   : {desired_angular_z:.2f}\n"
+        #     # f"Lin Vel X Joy   : {self.linear_x_joy:.5f}\n"
+        #     # f"Estimated Avg Vel   : {avg_velocity:.2f}\n"
+        #     # f"Velocity Error      : {self.velocity_pid_state.error:.2f}\n"
+        #     # f"Velocity Integral   : {self.velocity_pid_state.integral:.2f}\n"
+        #     # f"Wheel Commands      : [{action[0]:.2f}, {action[1]:.2f}]\n"
+        #     "=================================="
+        # )
 
 
     def step(self, action):
@@ -534,7 +545,7 @@ class ControlNode(Node):
         self.left_height = msg.left_height
         self.right_height = msg.right_height
         self.linear_x_joy = msg.linear.x * 0.05
-        self.angular_z_joy = msg.angular.z * 1.0
+        self.angular_z_joy = msg.angular.z * -1.0
         self.prev_state = msg.state
         
         # Log commands when they change

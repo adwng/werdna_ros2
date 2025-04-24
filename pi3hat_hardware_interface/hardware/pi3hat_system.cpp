@@ -429,7 +429,7 @@ hardware_interface::return_type pi3hat_hardware_interface::Pi3HatControlHardware
     hw_state_imu_orientation_[0] = a.attitude.x;      
     hw_state_imu_orientation_[1] = -a.attitude.y;     
     hw_state_imu_orientation_[2] = a.attitude.z;     
-    hw_state_imu_orientation_[3] = -a.attitude.w;      
+    hw_state_imu_orientation_[3] = -a.attitude.w; 
 
     hw_state_imu_angular_velocity_[0] = a.rate_dps.x * DEG_TO_RAD;  
     hw_state_imu_angular_velocity_[1] = a.rate_dps.y * DEG_TO_RAD;  

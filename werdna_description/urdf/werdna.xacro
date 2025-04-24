@@ -65,43 +65,32 @@
 
 
     <!-- imu -->
-    <!-- <link name="imu_link"></link> -->
-
-    <!-- imu joint -->
-    <!-- <joint name="imu_joint" type="fixed">
-        <origin xyz="${imu_offset_x} ${imu_offset_y} ${imu_offset_z}" rpy="0.0 0.0 0.0"/>
-        <parent link="base_link"/>
-        <child link="imu_link"/>
-    </joint> -->
-
-    <!-- Left Hip - Gearbox -->
-    <!-- <link name="left_hip_motor_link">
+    <link name="laser">
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
-                <cylinder radius="${gearbox_radius}" length="${gearbox_thickness}"/>
+                <box size="0.0556 0.0556 0.0413" rpy="0 0 0"/>
             </geometry>
             <material name="red"/>
         </visual>
         <collision>
             <origin xyz="0 0 0" rpy="0 0 0"/>
             <geometry>
-                <cylinder radius="${gearbox_radius}" length="${gearbox_thickness}"/>
+                <box size="0.0556 0.0556 0.0413" rpy="0 0 0"/>
             </geometry>
             <material name="red"/>
         </collision>
-        <xacro:inertial_cylinder mass="${gearbox_mass}" length="${gearbox_thickness}" radius="${gearbox_radius}">
-            <origin xyz="0 0 0" rpy="0 0 0"/>
-        </xacro:inertial_cylinder>
+        <xacro:inertial_box mass="0.1" x="0.0556" y="0.0556" z="0.0413">
+             <origin xyz="0 0 0" rpy="0 0 0"/>
+        </xacro:inertial_box>
     </link>
 
-    <joint name="left_hip_motor_joint" type="revolute">
-        <origin xyz="0.0 ${gearbox_offset_y} 0.0" rpy="${pi/2} -${pi/6} 0.0"/>
+    <joint name="laser_joint" type="fixed">
+        <origin xyz="0 0 ${chassis_height/2 + 0.0413/2}" rpy="0.0 0.0 -${pi}"/>
         <parent link="base_link"/>
-        <child link="left_hip_motor_link"/>
-        <axis xyz="0.0 0.0 1.0"/>
-        <limit lower="-0.524" upper="0.524" velocity="10" effort="20"/>
-    </joint> -->
+        <child link="laser"/>
+    </joint>
+
 
     <link name="left_hip_link">
         <visual>
