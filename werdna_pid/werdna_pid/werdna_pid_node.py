@@ -281,6 +281,11 @@ class ControlNode(Node):
             # self.velocity_pid_config.ki = 0.05
             # self.pitch_offset = 0.0
     
+    def interpolate_gain(self, value, min_val, max_val, min_gain, max_gain):
+        clamped_value = max(min_val, min(value, max_val))
+        ratio = (clamped_value - min_val) / (max_val - min_val)
+        return min_gain + (max_gain - min_gain) * ratio
+    
     def runtime_callback(self):
         if not self.current_state:
             self.step(np.array([0.0, 0.0]))
@@ -308,13 +313,21 @@ class ControlNode(Node):
         if (self.angular_z_joy > 0.05 or self.angular_z_joy < -0.05):
             desired_angular_z = self.angular_z_joy
         else:
-            desired_angular_z = self.angular_z_nav2
+            desired_angular_z = self.angular_z_nav2        
+
+        
 
         # === OUTER VELOCITY LOOP ===
         wheel_radius = 0.0855  # Adjust as needed for your robot
         left_vel = self.joint_velocities["left_wheel_joint"] * wheel_radius
         right_vel = self.joint_velocities["right_wheel_joint"] * wheel_radius
         avg_velocity = (0.5 * (left_vel + right_vel)) 
+
+        total_height = 0.5 * (self.left_height + self.right_height)
+
+        # Interpolate gains based on heights
+        self.balance_pid.config.kp = self.interpolate_gain(total_height, 0.0, 0.148, -1.4, -1.6)
+        self.balance_pid.config.kd = self.interpolate_gain(total_height, 0.0, 0.148, -0.28, -0.32)
 
         # Apply velocity PID controller
 
@@ -359,7 +372,6 @@ class ControlNode(Node):
 
         action = np.array([left_wheel_torque, right_wheel_torque])
 
-        total_height = 0.5 * (self.left_height + self.right_height)
 
         if self.logdata:
             # Log data for Excel export
@@ -392,21 +404,17 @@ class ControlNode(Node):
         # if int(time.time() * 5) % 5 == 0:  # Log at approximately 1Hz
         # self.get_logger().info(
         #     "\n========== PID CONTROL ==========\n"
-        #     f"Steer Action : {steer_output} rad\n"
-        #     # f"Target Pitch        : {target_pitch:.3f} rad\n"
+        #     f"Balance KP : {self.balance_pid.config.kp}"
+        #     f"Balance KD : {self.balance_pid.config.kd}"
         #     # f"Pitch               : {self.pitch:.3f} rad\n"
         #     # f"Yaw                 : {self.yaw:.3f} rad\n"
         #     # f"Roll                : {self.roll:.3f} rad\n"
         #     # f"Pitch Rate          : {self.pitch_vel:.3f} rad/s\n"
         #     # f"Yaw Rate          : {self.yaw_vel:.3f} rad/s\n"
         #     # f"Roll Rate          : {self.roll_vel:.3f} rad/s\n"
-        #     # f"Yaw Velocity        : {self.yaw_vel:.3f} rad/s\n"
         #     # f"Desired Lin Vel X   : {desired_linear_x:.2f}\n"
-                # f"Desired Angular Z   : {desired_angular_z:.2f}\n"
-        #     # f"Lin Vel X Joy   : {self.linear_x_joy:.5f}\n"
+        #     # f"Desired Angular Z   : {desired_angular_z:.2f}\n"
         #     # f"Estimated Avg Vel   : {avg_velocity:.2f}\n"
-        #     # f"Velocity Error      : {self.velocity_pid_state.error:.2f}\n"
-        #     # f"Velocity Integral   : {self.velocity_pid_state.integral:.2f}\n"
         #     # f"Wheel Commands      : [{action[0]:.2f}, {action[1]:.2f}]\n"
         #     "=================================="
         # )

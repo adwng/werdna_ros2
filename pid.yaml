@@ -1,11 +1,11 @@
 # Balance PID (inner loop for pitch control)
-balance_kp: -1.3 #Tune
-balance_kd: -0.28 #Tune
-balance_ki: 0.015 #Tune
+balance_kp: -1.4 #Tune
+balance_kd: -0.3 #Tune
+balance_ki: -0.1 #Tune
 balance_ilimit: 0.1
 
 # Velocity PID (outer loop for speed control)
-velocity_kp: -1.25 # Tune
+velocity_kp: -1.35 # Tune
 velocity_ki: -1.0 # Tune
 # velocity_kd: 0.0
 velocity_ilimit: 0.1 # Tune 
