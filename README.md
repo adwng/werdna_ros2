@@ -50,7 +50,7 @@ sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup mapping_slam.launch
 For Localization and Path Planning
 ```
 export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/werdna_ros2/pi3hat_hardware_interface/fastrtps_profile_no_shmem.xml
-sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup localization.py map:=$HOME/map.yaml
+sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup localization.py map:=$HOME/werdna_ws/map.yaml
 ```
 
 

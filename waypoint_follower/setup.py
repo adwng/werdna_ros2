@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'werdna_agent'
+package_name = 'waypoint_follower'
 
 setup(
     name=package_name,
@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "werdna_agent_node = werdna_agent.werdna_agent_node:main"
+            'waypoint_follower = waypoint_follower.waypoint_follower:main'
         ],
     },
 )
