@@ -1,5 +1,5 @@
 # WERDNA
-Wheeled Bipedal. These are the ROS2 implementations to be run on a Raspberry Pi 4 with *Ubuntu Mate* and *ROS2 Humble*. For the custom gym environments can be found [here](https://github.com/adwng/werdna_genesis).
+Wheeled Bipedal. These are the ROS2 implementations to be run on a Raspberry Pi 4 with *Ubuntu Mate* and *ROS2 Humble*. 
 
 The RPI4 is also intended to be connected to a pi3hat from mjbots which will be commanding the Moteus Drivers to actuate accordingly. 
 
@@ -8,9 +8,7 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 
   1. `ROS2 Control`
   2. `ROS2 Controllers` 
-  3. `Torch`
-  4. `Moteus`
-  5. `pi3hat`
+  3. `Moteus`
    
 </details>
 
@@ -27,6 +25,12 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 |`werdna_agent`|Node to run trained agent inference|
 |`werdna_odometry_broadcaster`|Broadcaster for Odometry|
 
+### Additioanl Packages
+|_Packages_|_Functionality_|
+| ------------- | ------------- |
+|`sllidar_ros2`|Driver for Lidar|
+|`rosboard`|ROSBOARD Build - has custom visualizations for URDF and IMU|
+
 ## Code Run
 **Launch in Base**
 |`CAPTCHAS`|`Explanation`|
@@ -40,6 +44,7 @@ The RPI4 is also intended to be connected to a pi3hat from mjbots which will be 
 export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/werdna_ros2/pi3hat_hardware_interface/fastrtps_profile_no_shmem.xml
 sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup launch_robot.py
 ```
+It should should launch the description, relevant controllers, rosboard and hardware interface.
 
 "Launch this for mapping and save new map"
 ```
@@ -50,11 +55,9 @@ sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup mapping_slam.launch
 For Localization and Path Planning
 ```
 export FASTRTPS_DEFAULT_PROFILES=/home/andrew/werdna_ws/src/werdna_ros2/pi3hat_hardware_interface/fastrtps_profile_no_shmem.xml
-sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup localization.py map:=$HOME/werdna_ws/map.yaml
+sudo -E /home/andrew/runasroot.sh ros2 launch werdna_bringup localization.py
 ```
 
-
-It should should launch the description, relevant controllers, rosboard and hardware interface.
 
 > [!NOTE]
 > If wish to view ROS2 topics and also enable your other programs to publish/subscribe to it. Ensure the session is enabled the same way as the script above (entering superuser mode->exporting profiles->sourcing relevant environments).
@@ -126,6 +129,24 @@ Selected based on *control mode* in the urdf file, it requires manual adjustment
 
 Ensure its at default position where all joints report `0`.
 
+## Adjusting PID Params
+PID Params can be edited via the [parameter file](pid.yaml) to avoid rebuilding when testing new PID values. Nonetheless, it is assumed that users familiar with ROS2 and Linux should know when to build to implement new features.
 
+## Bugs
+Starting Either SLAM or Nav2 causes a system delay for the PID controller, meaning it will disrupt the loop frequency of the PID controller 
+- Recommend to write the PID controller as a custom ROS2 Control Controller to see if the overhead from the SLAM and Nav2 stack will continue to effect it.
+- Otherwise, try to find methods to ensure the PID controller is not disrupted when launching other packages.
 
+## Improvements
+1. Recommend to rewrite Pi3Hat Interface to support manipulation in KP, KD, and KP values like the one written by Gabriel Levine's Pi3Hat Interface. I suggest joining the moteus discord to discuss matters.
+2. Cooling, feel free to add more fans or ventilation to the system as the motors tend to heat up easily if without sufficient cooling, if heated up too much it will lose massive amounts of torque due to heat losses.
+3. Power Distribution System - I feel that the implemented power distribution system is quite janky, so feel free to modify or improve the dist system to mitigate chances of magic smoke.
+4. Soldering, the soldering done on the wheel motors to drivers is not perfect, please improve the connection method, i.e. using 3 pin XT60 connectors are perfect.
+
+## Additional Materials
+It is recommended to fully familiarize themselves with the Moteus Ecosystem and code architecture such as Tview, C++ bindings, and FOC limits.
+Additionally, It is also recommended to familiarize themselves with Linus Systems to better understand debugging errors. The same can be said with ROS2 as well. This helps predict future errors encountered such as race conditions, looping frequencies, differences between nodes and ROS2 controllers/hardware interfaces.
+
+## Mechanical Structure
+The mechanical design is free to be redesigned as the current design is a proof of concept in using a 4 bar linkage system to control the height of the WBR. However, there are limitations to it inherently. To approach this, feel free to design a true 3 dof leg that can move front to back and up and down. Otherwise, maintaining the original design is left to optimize the mechanical stability of the system (adding bracing for instance) to avoid constant breakage.
 
